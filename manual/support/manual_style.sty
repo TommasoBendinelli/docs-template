@@ -37,7 +37,7 @@
 \@ifundefined{manualDocDefaultSourceBaseName}{%
   \newcommand{\manualDocSourceBaseName}{\jobname.tex}%
 }{%
-  \newcommand{\manualDocSourceBaseName}{\manualDocDefaultSourceBaseName}%
+  \edef\manualDocSourceBaseName{\manualDocDefaultSourceBaseName}%
 }
 \makeatother
 
@@ -67,13 +67,8 @@
 \urlstyle{same}
 \newcommand{\manualDocName}{}
 \newcommand{\setManualDocSourceName}[1]{\renewcommand{\manualDocSourceBaseName}{#1}}
-\newcommand{\manualDocSourceName}{\code{\manualDocSourceBaseName}}
-\newcommand{\code}[1]{%
-  \begingroup
-  \def\UrlFont{\ttfamily}%
-  \nolinkurl{#1}%
-  \endgroup
-}
+\newcommand{\manualDocSourceName}{\expandafter\code\expandafter{\manualDocSourceBaseName}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\titlecode}[1]{\code{#1}}
 
 \newcommand{\docTitle}[2][]{%
@@ -100,4 +95,3 @@
 }
 
 \newcolumntype{P}[1]{>{\raggedright\arraybackslash}p{#1}}
-

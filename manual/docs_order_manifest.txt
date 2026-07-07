@@ -1,0 +1,7 @@
+# Render order for PDFs built from manual/src.
+# List one .tex filename per line. Blank lines and comment lines are ignored.
+notes_system.tex
+results_guideline.tex
+codex_session.tex
+service_running.tex
+tailscale_setup.tex

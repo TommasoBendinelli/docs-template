@@ -1,4 +1,31 @@
+# macOS
+.DS_Store
+
+# Local editor state
+*.swp
+*.swo
+*~
+
+# LaTeX build output
 /build/
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+
+# Rendered PDFs
 /pdf/*
 !/pdf/.gitkeep
-
+manual/comments/__pycache__/pdf_comments.cpython-313.pyc
