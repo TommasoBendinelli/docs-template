@@ -250,21 +250,43 @@ The source files in \code{tex/source/} therefore define the renderable document 
 The \code{*_combined.pdf} file contains those documents in manifest order, followed by any supported cross-project PDFs referenced by hyperlinks in the source documents.
 \agentProposedEdit
   {agent-add-085832be-ab6f-5e33-9008-315b5bc398c5}
-  {Standardize every documentation repository around one explicit TeX build closure so synchronization excludes raw data and unrelated project material, as prepared in Codex conversation hash 01a03d38-a300-7be1-ac03-4b540a4f117d.}
+  {Clarify the canonical documentation layout by marking which project roles are published to Fedora, uploaded only when selected, synchronized separately, or never sent, as prepared in Codex conversation hash 01a03d38-a300-7be1-ac03-4b540a4f117d.}
   {}
   {Every \path{docs-*} repository uses its existing \path{tex/} tree as the complete project-local compilation boundary.
-The authoritative standalone order is stored in \path{tex/docs_order_manifest.txt}, and every listed entry is an authored UTF-8 TeX file under \path{tex/source/}.
-Optional authored included TeX belongs under \path{tex/fragments/}, and optional authored styles and bibliographies belong under \path{tex/support/}.
-Optional authored binary compilation inputs belong under \path{tex/assets/}, and only machine-produced inputs consumed by the current canonical PDF belong under \path{tex/generated/}.
-Generated TeX is a content-addressed build object under \path{tex/generated/}, rather than an editable source-frontier file.
-Generator programs belong under \path{scripts/}, compact tracked manifests and provenance belong under \path{scripts/provenance/}, and ignored raw or bulky generation material belongs under \path{.cache/generation/}.
-Review state remains under \path{comments/}, project material that must never be discovered implicitly remains under \path{third_party/}, retired material remains under \path{archive/}, and release packages remain under \path{submission/}.
-Compilation output belongs under the ignored \path{build/} and \path{pdf/} trees.
-The workspace-global \path{third_party/} directory is never enumerated, while a source-level \code{\PdfLink} may select one explicit direct PDF from that registry.
-No canonical compile may read scripts, caches, archives, submissions, another project, or an undeclared global dependency.
+\begin{itemize}
+\item The \path{tex/} directory is the complete Fedora build boundary.
+\begin{itemize}
+\item The \path{tex/docs_order_manifest.txt} file is an authored source-frontier file published to Fedora.
+\item The \path{tex/source/} directory contains authored source-frontier files published to Fedora.
+\item The optional \path{tex/fragments/} directory contains authored source-frontier files published to Fedora.
+\item The optional \path{tex/support/} directory contains textual source-frontier files published to Fedora.
+\item The optional \path{tex/assets/} directory contains selected content-addressed objects uploaded to Fedora when missing.
+\item The optional \path{tex/generated/} directory contains selected content-addressed objects uploaded to Fedora when missing.
+\end{itemize}
+\item The \path{scripts/} directory and its compact tracked \path{scripts/provenance/} records are not sent to Fedora.
+\item The ignored \path{.cache/generation/} directory contains raw or bulky generation material that is not sent to Fedora.
+\item The \path{comments/} directory is synchronized through the separate comment channel and is not a build input.
+\item The \path{third_party/} directory is never enumerated or implicitly sent to Fedora.
+\item The \path{archive/} and \path{submission/} directories are not sent to Fedora.
+\item The ignored \path{build/} and \path{pdf/} directories are not sent to Fedora.
+\end{itemize}
+The labels in this tree describe Fedora publication behavior, rather than Git tracking behavior.
+The target project's manifest, authored files under \path{tex/source/} and \path{tex/fragments/}, and textual styles or bibliographies under \path{tex/support/} form its editable source frontier.
+Targeted synchronization publishes only changed frontier files and deletions from those authored roots.
+Binary authored inputs under \path{tex/assets/} and derived inputs under \path{tex/generated/} are content-addressed build objects, rather than editable source-frontier files.
+Only objects selected by the target's exact build snapshot are considered, and an object's bytes are uploaded only when Fedora does not already have its hash.
+Generated TeX belongs under \path{tex/generated/} when the current canonical PDF actually consumes it.
+A source-level \code{\PdfLink} may select one explicit direct PDF from the approved external registry, and only that PDF is added to the snapshot as an external object.
+Review records under \path{comments/} synchronize through the separate comment channel and never become TeX build inputs.
+Generator programs, compact provenance, raw generation caches, archives, release packages, local build output, and rendered PDFs are never published as project source or build objects.
+Neither a project-local nor workspace-global \path{third_party/} tree is enumerated, and an unreferenced file in either tree is never uploaded.
 Raw JSON, result collections, generator inputs, bulky provenance, editable Drawio sources, and unused outputs must remain outside \path{tex/}.
+Normal Sync reconciles the selected project's exact source frontier and selected objects and publishes its snapshot without compiling.
+Normal Build performs the same targeted reconciliation and then asks Fedora to compile that exact snapshot.
+Sync All and Build All iterate registered projects independently, rather than creating one workspace-wide upload.
+No canonical compile may read scripts, caches, archives, submissions, another project, or an undeclared external dependency.
 The layout checker rejects unsupported \path{tex/} roles, manifest disagreement, invalid UTF-8, escaping symlinks, secrets, provenance payloads, and cross-project compilation paths.
-A Fedora-verified dependency closure must identify every declared build object that was consumed and every project-local compiler input that was authorized.}
+Fedora must verify that every project-local compiler input was authorized and that every declared asset, generated object, renderer control, and explicit external PDF was consumed.}
 
 Each document repository should also be listed in \code{library/README.md}.
 \agentProposedEdit
