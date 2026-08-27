@@ -1,0 +1,655 @@
+\begin{document}
+\docTitle{Guide to the notes system}
+\phantomsection
+\label{doc:notes-system}
+This document describes the goals and architecture of the system used for knowledge management and project tracking.
+The system is based on the idea that PDFs are the best medium for consuming information and that having access to them on a phone makes it possible to work from anywhere.
+The goal of the system is to provide a structured workflow for writing, reading, reviewing, and preserving notes. 
+The workflow is based on the following setup:
+
+\begin{itemize}
+  \item Notes are written mainly in LaTeX on my personal MacBook.
+  \agentProposedEdit
+    {agent-proposal-only-policy-20260824}
+    {Align this note-authoring policy with the authoritative global AGENTS.md instructions.}
+    {\agentImportant{Notes are written by humans.
+        Information most relevant to agents is enclosed in \agentImportant{}.
+        Notes written by agents must use the retired LaTeX command displayed as \code{\textbackslash agent\{\}}.
+        An agent must not edit or delete notes written by humans.
+        An agent must not create \code{\agentImportant{}} sections.
+        An agent may directly edit or delete existing note text written inside the retired command displayed as \code{\textbackslash agent\{\}}.
+        For existing note text not written inside that retired command, the only permitted modification is to wrap the exact text in \code{\textbackslash agentProposedEdit\{stable-id\}\{agent comment\}\{text\}\{new version of the tex\}}.
+        The agent comment must explain why the wrapped text should be edited.
+        In case you want to simply remove the tex, you can leave new version of the tex empty.
+        Each sentence must be written on a single line.
+        There must be exactly one sentence per line.
+        There are no exceptions.}}
+    {\agentImportant{The information most relevant to agents is enclosed in \code{\textbackslash agentImportant\{\}}.
+        An agent must not directly edit or delete any existing note text.
+        An agent must use the \code{\textbackslash agentProposedEdit} command.
+        For new note text, leave the original-text argument empty: \code{\textbackslash agentProposedEdit\{stable-id\}\{agent comment\}\{\}\{new version of the tex\}}.
+        For an edit, wrap the exact existing text in \code{\textbackslash agentProposedEdit\{stable-id\}\{agent comment\}\{old text version\}\{new version of the tex\}}.
+        For a deletion, leave the new-version argument empty: \code{\textbackslash agentProposedEdit\{stable-id\}\{agent comment\}\{old text version\}\{\}}.
+        The agent comment must explain why the proposed change is needed.
+        An agent must never nest an agent proposal inside another agent proposal.
+        To revise an existing pending proposal, preserve its stable ID and original-text argument exactly and edit only its agent comment and new-version argument.
+        The proposal command and each of its four arguments may span multiple physical lines.
+        Every physical line containing newly written prose must contain exactly one complete sentence.
+        Lines containing only TeX structure, argument delimiters, or whitespace do not need to contain a sentence.
+        Each proposal must have a stable ID that is unique across the documentation workspace.
+        There are no exceptions.
+        Search through the notes whenever you are unsure about anything else.
+        If the user's request is inconsistent with the documentation, ask the user for clarification.
+        When writing either in TeX or responding to the user, use Tommaso's style as inferred from the TeX source.}}
+  \item Notes can also be read and commented on using a phone.
+        Tex can also be edited on the phone, but it's not the main source.
+\end{itemize}
+\ReviewAnchor{mjpdf-2760d2c8-90d5-48f7-b38f-02d1828b8b5f}{On the phone clicking on home it should not close the other tab. There should be like a button (like hold)}%
+
+Thoughts Desktop and Thoughts Android exchange documents, comments, reviews, source edits, and rebuild state through the private Thoughts server over Tailscale.
+
+\agentProposedEdit
+  {agent-add-3974c1a3-02ec-52e9-a21f-f12d6d56ba84}
+  {Add this agent-authored block for review.}
+  {}
+  {\subsection*{Shared synchronization and PDF status model}
+PostgreSQL is authoritative for mutable operations, projections, source revisions, build jobs, and publication pointers, while the server's content-addressed object store is authoritative for immutable source bytes, PDFs, indexes, logs, and provenance.
+The server worktree, client caches, JSONL sidecars, and locally activated PDFs are reconstructable materialized views rather than competing authorities.
+A normal \textbf{Sync} publishes queued managed sources and lightweight operations, receives Fedora changes and authoritative status, and activates any ready complete verified Library generation without authorizing a PDF build.
+A local source draft remains only on the device until \textbf{Publish} queues a durable source save, and publishing that source does not authorize compilation by itself.
+\textbf{Build \& Sync} is offered only after Fedora reports \textbf{Build required}, explicitly authorizes that build, and activates the resulting verified Library generation.
+Every build is bound to an exact source frontier, exact managed-input snapshot, comment frontier, annotation frontier, and toolchain identity, so a later TeX, SVG, generated-file, or support-file edit cannot race into an already queued build.
+\paragraph{Actionable document statuses}
+\textbf{Sync needed} means that local operations or managed sources are pending, authoritative status is unknown, or an already-built verified PDF is missing locally, and its only workflow action is \textbf{Sync}.
+\textbf{Build required} means that synchronized Fedora inputs are newer than the latest successful PDF, and its only workflow action is \textbf{Build \& Sync}.
+A local TeX edit therefore progresses through \textbf{Sync needed}, \textbf{Build required}, and \textbf{Synced} using two explicit clicks.
+On Android, \textbf{Sync} transfers on Wi-Fi without interruption, while on mobile data it asks once for the exact synchronization plan only when either the upload or download estimate exceeds the configurable threshold under \textbf{Synchronization} in \textbf{Settings}, which defaults to 5 MB, and otherwise continues automatically.
+\textbf{Synced} requires a current Fedora build, a locally verified Library generation and PDF hash, and no pending local work, so it has no action and shows a green check together with the last verified synchronization time.
+\textbf{Sync failed}, \textbf{Comments need attention}, and \textbf{Build failed} preserve queued work or the last-good PDF and expose \textbf{Sync}, error details, or \textbf{Build \& Sync} as appropriate.
+Checking, syncing, queued, building, waiting, and activating are transient progress states, so they never offer another build request while the current operation is running.
+Opening Desktop Overview or Android Library reads only the last locally persisted Fedora snapshot, performs no Fedora or Library-head request, and never scans or hashes local build inputs.
+Both clients display counted aggregate sentences for every PDF state, including \textbf{16 PDFs need a build} and \textbf{19 PDFs are up to date}.
+Both clients cache Fedora's server-issued observation time together with the latest successful Fedora PDF build time, while a failed fetch preserves the previous snapshot and both timestamps and reports \textbf{Status not refreshed}.
+A successful Fedora PDF build is displayed as seconds, minutes, or hours ago for its first 24 hours and as a localized exact date and time thereafter, with relative text advancing from a local timer that performs no request.
+Desktop starts an ordinary \textbf{Sync} immediately, while selecting \textbf{Build \& Sync} first refreshes the global snapshot, displays \textbf{Checking build inputs\ldots}, and performs the exact affected-PDF check without blocking the interface.
+The native C++ verifier may reuse only dependency paths and graph-definition hashes, while every \textbf{Build \& Sync} click rereads and computes SHA-256 over every actual managed source and exact target input byte.
+Any missing input, changed byte, graph error, snapshot error, or timeout clears all build authorization, performs only an ordinary \textbf{Sync}, and requires a later explicit \textbf{Build \& Sync} click.
+Build eligibility follows the authoritative Library kind, while source layouts remain responsible only for comment and review grouping.
+While Desktop is publishing sources, the enabled Overview control becomes \textbf{Show Sync Log} and opens or focuses a Terminal tab that follows the timestamped publisher log without blocking the interface.
+Opening a PDF remains the action of selecting its row or thumbnail, and no status badge duplicates that behavior with an \textbf{Open PDF} action.
+On Android, a full-width cached status row directly above \textbf{Linked documents} opens the global dialog with the same count and timestamps, while the dialog and document badges expose at most one status-specific action.
+In Thoughts Android, the first \textbf{Sync \& Build} tile in the reader's three-dot menu and the matching row in a managed Library PDF's options open the same cached per-PDF status panel with the last successful synchronization, the last successful Fedora build, and visible \textbf{Sync} and \textbf{Build} buttons that stay open, immediately show \textbf{Syncing} or \textbf{Building}, present both timestamps as \textbf{a moment ago} for the first minute, whole minutes or hours below 24 hours, and an exact localized date and time thereafter, and are disabled when unavailable; the outer Library options dialog closes when the panel opens, while tapping outside the panel or using Android Back dismisses it.
+On Desktop, the main toolbar control is always labelled \textbf{Sync}, while its arrow menu shows the active PDF's status, reason, last verified time, latest build output, and \textbf{Build \& Sync} only when appropriate.
+Only explicit synchronization, explicit build synchronization, pull-to-refresh, or recovery of that already-running operation may call \path{/v1/render-state?target=all}, while local queues, receipts, and activated-Library watchers may update the presentation without a Fedora read.
+Desktop and Android can assign a synchronized display name to any linked or unlinked Library PDF without changing its filename, document identity, comments, source layout, or build linkage.
+Desktop and Android can archive any Library PDF into a section below Unlinked, where it remains openable, commentable, synchronized, buildable, and visible in All Comments until the same metadata action unarchives it.
+Android's device-local Hide action remains independent from synchronized archive metadata.}
+
+\ReviewAnchor{mjpdf-8afbd814-c5d0-4a3f-8d8f-1d9626ea6639}{Pdf takes way too long to open like sdpo Templates}%
+\subsection*{Phone workflow}
+\ReviewAnchor{1bfbf778-6f09-4372-9d30-fc63b08fac47}{Right now it's annoying comments are not visible and it's very easy to close the comment, is should easier to scroll over it}%
+\ReviewAnchor{293d915f-86aa-42e6-833d-a1dace5aaf6f}{The command that close them is too sensitive}%
+\ReviewAnchor{897cb3da-0b57-4c71-ac75-3670e4df0f6e}{The only part of the bar that is allowed to change the size should be the top one}%
+\ReviewAnchor{a14804be-b830-4cf5-a2b4-3d1364641718}{Enable drug and drppin commands also in mjpdf. To have this working we need to first fix the focus... i.e. it should not be blocked with the comment open}%
+\ReviewAnchor{mjpdf-8980932b-0fe7-45b8-8df2-ff1e3353f8cf}{Reply comments in MJ PDF do not work neither the overview page is fucked up}%
+\agentProposedEdit
+  {agent-add-be2471d3-63ca-5f3d-a453-594ed9b941bb}
+  {Add this agent-authored block for review.}
+  {}
+  {\subsubsection*{Thoughts Android}}
+Thoughts Android is used for viewing and commenting on PDFs.
+\ReviewAnchor{mjpdf-de97f3ef-5b09-49a4-b19f-65357585b0ae}{Also the .Tex change on Android doesn't work}%
+\agentProposedEdit{agent-remove-b95c499b-95a7-5dbf-88ee-7fed1c72a9c3}{the server-managed offline Library now owns this location}{By default this is \path{/storage/emulated/0/Documents/docs-clean-pdfs}, but it can be set.}{}
+\agentProposedEdit{agent-remove-ae2b18ce-2ce4-57b7-b5d9-a1d0678d581b}{the folder is no longer a Syncthing relation}{The synched folder on the smartphone is \path{/storage/emulated/0/Documents/docs-clean-pdfs}.}{}
+\agentProposedEdit
+  {agent-add-5bcbecaa-4a35-5083-9b48-f0b5a9bdeb07}
+  {Add this agent-authored block for review.}
+  {}
+  {The server-managed offline Library is stored at \path{/storage/emulated/0/Documents/docs-clean-pdfs}, and each successful manual sync atomically activates every changed PDF after SHA-256 verification.}
+\agentProposedEdit{agent-remove-9e9630bb-f886-5c15-98fc-f061311933b2}{inconsistent with sidecar-first comment storage}{Comments added/deleted/edits are propagate through synched folder to the rest, and already embedded to the pdf, so that they are visible to other PDF viewer apps.}{}
+\paragraph{UI workflow}
+\ReviewAnchor{comment-5133d841d1030ebc9ad7ebafc0209d9a}{Only documents that are in the library (Unlined documents) should appear in the PDFLink}%
+Comments can be selected and they opens you have the option of modifying them or delete them. 
+No confirmation pop up message appears.
+Thoughts Android is the smartphone application: its home screen searches and browses the PDFs associated with each note, and selecting an entry opens that PDF in the same app.
+There is a icon on the main page of the phone that jumps directly to that folder.
+Each note entry displays:
+\begin{itemize}
+  \item when the PDF was last modified;
+  \item when the last comment was added;
+  \item the number of unresolved top-level comment threads.
+\end{itemize}
+Replies are searchable and visible inside their thread, but do not increase the unresolved count.
+The document can be annotated with sticky-note comments, threaded replies, or comments attached to highlighted text.
+\agentProposedEdit{agent-remove-3e36713b-748c-45c4-b9cd-48696291a9cc}{replace the former generic rebuild controls with the status-specific actions implemented by Thoughts Android}{The per-note action queues a targeted rebuild of that canonical PDF, while the Library menu can queue a confirmed rebuild of all PDFs.}{}
+\agentProposedEdit{agent-remove-6a5d0761-7804-55de-aff3-be8be9968f73}{replaced by the durable Fedora build queue}{Requests are written atomically under \path{Documents/phone-to-mac/docs-render-requests} and Syncthing delivers them to the Mac, so a request remains queued while the Mac is asleep or offline.}{}
+\agentProposedEdit{agent-remove-df36109a-85dd-4718-8e87-7bc3b04a57b4}{replace the former application name and request format with the current durable operation flow}{After MJ PDF durably saves a comment addition, edit, reply, or deletion on a canonical PDF, it places the complete changed comment record in a private crash-safe delivery outbox before clearing the edit journal.}{}
+\agentProposedEdit{agent-remove-d1321cd2-b91c-425e-b2a3-5b4664d3d1d0}{schema v5 operations and explicit build authorization replace the former schema-v4 targeted request}{A short per-PDF debounce combines the newest pending comment revisions into one schema-v4 targeted request containing both the anchor requirements and their complete comment records.}{}
+
+This status never prevents reading, adding more comments, or leaving the document.
+\agentProposedEdit
+  {agent-add-c2d0ae81-8127-56dc-9950-a5f988cd9fec}
+  {Update the pending synchronization description to record the server-native Fedora build boundary and v2 input identity after renderer cutover work in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {Thoughts Android records every comment addition, edit, reply, deletion, review card, review event, and published source edit in a private crash-safe queue before it is eligible for synchronization.
+The document row derives its status from that durable local queue together with Fedora's render status and the verified local Library generation.
+Thoughts Android never opens receipt-triggered dialogs automatically, while failures and anchoring attention remain visible through the actionable status badge until a newer successful result supersedes them.
+Thoughts Android keeps comments, reviews, and published source edits durable locally, schedules their background delivery, and lets \textbf{Sync Now} force an immediate manual synchronization.
+A manual synchronization is a user-initiated transfer that continues after Thoughts Android closes, displays a cancellable notification, downloads every changed Library PDF for offline use, and stops when the durable queue is empty.
+During that finite transfer, unchanged Library metadata uses an HTTP conditional response, immutable objects are fetched only when missing, interrupted PDFs resume from their verified partial files, and compact offline source lookup objects replace complete SyncTeX archives.
+The Fedora worker records each rebuild together with its exact source, comment, annotation, and build-input frontiers in PostgreSQL and exposes progress, results, and logs through the authenticated server API.
+The v2 build-input snapshot identifies the target, project, discovery-policy version, and every content-addressed path by SHA-256, size, and media type.
+The server-native Python renderer reconstructs those inputs in an isolated per-job workspace and invokes the TeX, PDF, SyncTeX, link, comment, and source-artifact components without a Mac renderer process.}
+\agentProposedEdit{agent-remove-b407a052-aaa0-43f0-ab1e-b1ec2f1589ad}{the server Library generation and device verification records replace Mac receipts}{Mac receipts include the full SHA-256 of the published PDF, and MJ PDF reloads the synchronized replacement only after the local file matches that identity and no text selection or save is active.}{}
+\agentProposedEdit{agent-remove-6ab4f205-204f-4362-8e5f-a930f43063c4}{provenance is retained by the authoritative server rather than described as a Mac-only manifest}{Every published PDF identity has a retained Mac provenance manifest that maps combined pages to the exact source build and local page.}{}
+\agentProposedEdit{agent-remove-4793380d-295a-4b7b-aebe-f950c9ab26e4}{source anchoring now consumes the authoritative historical build provenance on the server and its materialized client views}{The native synchronizer interprets phone geometry against that historical build and remaps the resulting source line into the current source.}{}
+\agentProposedEdit
+  {agent-add-9d3be56b-cb49-5c5e-beb2-19af26e1d930}
+  {Add this agent-authored block for review.}
+  {}
+  {Opening a canonical PDF never requests a build, and a build begins only after the user selects the matching explicit build action.
+Thoughts Android computes the full SHA-256 of the PDF loaded by the reader and stores it as \code{annotation_pdf_sha256} on every new comment record.
+Thoughts Android activates a synchronized replacement only after the complete Library generation and the PDF's SHA-256 identity have been verified.
+The server retains provenance that maps every published combined page to its exact build input and source location.
+The synchronizer interprets phone geometry against that retained historical build and conservatively remaps the resulting source line into the current source.
+Missing historical evidence or ambiguous selected text remains \code{needs_anchor} and never creates a guessed high-confidence source marker.}
+
+\subsection*{Computer workflow}
+\agentProposedEdit
+  {agent-add-48efd945-b9f1-5bef-abbe-c4d32bb9a5d1}
+  {Add this agent-authored block for review.}
+  {}
+  {We use VS Code to modify the \code{.tex} notes and \TexLink{docs-template/thoughts.tex}{doc:thoughts}{Thoughts Desktop} to review and annotate the rendered PDFs.
+For every source listed in the current render layout, the VS Code tab context menu can open that source's canonical annotated PDF directly in Thoughts Desktop, while unlinked sources do not show the action.}
+The root folder is \code{/Users/tbe/Documents/docs}.
+\agentProposedEdit
+  {agent-add-26331872-1e6f-53e8-a1c8-6aa18662d336}
+  {Add this agent-authored block for review.}
+  {}
+  {The following workspace tree is a historical layout and is superseded by the canonical project policy below.}
+\agentProposedEdit
+  {fedora-native-workspace-tree-20260825}
+  {Replace the historical renderer tree with the post-cutover workspace tree from Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The folder structure is:
+\begin{DocCode}
+  docs/
+  |-- docs-*/                 # readable source repositories
+  |-- current_pdfs/           # one current reading copy per note
+  |-- comments/               # canonical annotations
+  |-- library/                # document catalogue
+  |-- tools/
+  |   |-- latex/
+  |   |   |-- manual_style.sty
+  |   |   `-- tex/support/references.bib
+  |   |-- render_all.sh
+  |   |-- render_skip_projects.txt
+  |   `-- ...
+  `-- .runtime/               # logs, locks and temporary root builds
+\end{DocCode}}
+  {The active folder structure is:
+\begin{itemize}
+\item The \code{docs-*/} folders contain the self-contained source repositories.
+\item The \code{current_pdfs/} path selects the active read-only Library generation.
+\item The \code{comments/} folder contains the canonical annotation sidecars.
+\item The \code{library/} folder contains the document catalogue.
+\item The \code{tools/} folder contains \code{check_docs_layout.py}, \code{check_results_guidelines.py}, and focused tests for those two checks.
+\end{itemize}}
+\code{docs-*} projects contain the note sources.
+\agentProposedEdit{agent-remove-02e2bd1e-4943-5691-8af7-c69024803a3b}{incomplete for the current workspace layout}{The other visible top-level folders are: \code{current_pdfs/}, \code{comments/}, \code{library/}, and \code{tools/}.}{}
+\agentProposedEdit
+  {fedora-remove-root-runtime-20260825}
+  {Delete the retired Mac renderer runtime description after its cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {Runtime logs, locks, and temporary root-level render recovery files live under \code{.runtime/}.}
+  {}
+
+
+\agentProposedEdit
+  {fedora-tools-allowlist-20260825}
+  {Replace the obsolete renderer-tool description with the focused post-cutover allowlist from Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The \code{tools/} folder contains the PDF-building and automation utilities.}
+  {The \code{tools/} folder contains only the two active workspace checks and their focused tests.}
+\agentProposedEdit
+  {agent-add-a84bed26-e52f-5941-8b19-fa1699e41c05}
+  {Add this agent-authored block for review.}
+  {}
+  {Every project owns every style and bibliography needed for compilation under \path{tex/support/}.
+The renderer resolves TeX and bibliography inputs from the project rather than from the workspace-wide \path{tools/latex/} directory.
+A self-contained project's local and external entry points must load the same project-owned style instead of maintaining a separate Overleaf compatibility preamble.}
+
+\section*{Note folder structure}
+Each document collection should have its own Git repository and a corresponding entry in the document library.
+\agentProposedEdit
+  {agent-add-0b120efe-d97a-5f0d-9a1e-b02f25c51c8e}
+  {Add this agent-authored block for review.}
+  {}
+  {The following example tree is historical and the authoritative layout is the policy stated immediately after it.}
+\begin{DocCode}
+docs-my-topic/
+|-- .git/
+|-- generated/ [OPTIONAL self-contained export artifacts]
+|   `-- tex/support/references.bib
+|-- manual/
+|   |-- docs_order_manifest.txt
+|   |-- src/
+|   |   |-- first_note.tex
+|   |   `-- second_note.tex
+|   `-- support/ [OPTIONAL project-specific configuration]
+|-- pdf/ [.gitignored]
+|   |-- my-topic_first_note.pdf
+|   `-- my-topic_combined.pdf
+|-- third_party/ [OPTIONAL]
+|   |-- first.pdf
+|   `-- second.pdf
+`-- build/ [.gitignored]
+\end{DocCode}
+For every \code{docs-*} repository, \code{docs_order_manifest.txt} defines the order in which files from \code{tex/source/} appear in the combined PDF.
+The rendering tool reconciles the manifest with the current standalone source files: it preserves the listed order, removes stale entries, and appends newly discovered renderable files.
+Each non-comment line names one \code{.tex} file.
+Blank lines and comment lines are ignored.
+The source files in \code{tex/source/} therefore define the renderable document set, while the manifest controls the combined-PDF order.
+The \code{*_combined.pdf} file contains those documents in manifest order, followed by any supported cross-project PDFs referenced by hyperlinks in the source documents.
+\agentProposedEdit
+  {agent-add-085832be-ab6f-5e33-9008-315b5bc398c5}
+  {Standardize every documentation repository around one explicit TeX build closure so synchronization excludes raw data and unrelated project material, as prepared in Codex conversation hash 01a03d38-a300-7be1-ac03-4b540a4f117d.}
+  {}
+  {Every \path{docs-*} repository uses its existing \path{tex/} tree as the complete project-local compilation boundary.
+The authoritative standalone order is stored in \path{tex/docs_order_manifest.txt}, and every listed entry is an authored UTF-8 TeX file under \path{tex/source/}.
+Optional authored included TeX belongs under \path{tex/fragments/}, and optional authored styles and bibliographies belong under \path{tex/support/}.
+Optional authored binary compilation inputs belong under \path{tex/assets/}, and only machine-produced inputs consumed by the current canonical PDF belong under \path{tex/generated/}.
+Generated TeX is a content-addressed build object under \path{tex/generated/}, rather than an editable source-frontier file.
+Generator programs belong under \path{scripts/}, compact tracked manifests and provenance belong under \path{scripts/provenance/}, and ignored raw or bulky generation material belongs under \path{.cache/generation/}.
+Review state remains under \path{comments/}, project material that must never be discovered implicitly remains under \path{third_party/}, retired material remains under \path{archive/}, and release packages remain under \path{submission/}.
+Compilation output belongs under the ignored \path{build/} and \path{pdf/} trees.
+The workspace-global \path{third_party/} directory is never enumerated, while a source-level \code{\PdfLink} may select one explicit direct PDF from that registry.
+No canonical compile may read scripts, caches, archives, submissions, another project, or an undeclared global dependency.
+Raw JSON, result collections, generator inputs, bulky provenance, editable Drawio sources, and unused outputs must remain outside \path{tex/}.
+The layout checker rejects unsupported \path{tex/} roles, manifest disagreement, invalid UTF-8, escaping symlinks, secrets, provenance payloads, and cross-project compilation paths.
+A Fedora-verified dependency closure must identify every declared build object that was consumed and every project-local compiler input that was authorized.}
+
+Each document repository should also be listed in \code{library/README.md}.
+\agentProposedEdit
+  {agent-add-980fe476-ccea-5ad1-8489-ef5be4afca74}
+  {Add this agent-authored block for review.}
+  {}
+  {Authored files whose basename begins with \code{README}, case-insensitively, are not allowed anywhere in a \code{docs-*} repository; \path{library/README.md} is the sole README entrypoint for the documentation workspace on GitHub.}
+\begin{DocCode}
+- [docs-my-topic](https://github.com/<user>/docs-my-topic) - Short description of the document set.
+\end{DocCode}
+
+\subsection*{Current PDF structure}
+This contains exactly one current PDF per note.
+\agentProposedEdit{agent-remove-1de42965-d4d2-51e2-bcbe-537fe98bd690}{the Fedora server now publishes this folder}{The folder is published to the phone as \path{Documents/docs-clean-pdfs}; it is a reading transport, not a comment-version exchange.}{}
+\agentProposedEdit{agent-remove-58b5dfd5-7ae4-546a-958a-2d44746e1b2a}{replaced by the Thoughts identity}{The renderer atomically publishes \path{current_pdfs/.thoughts-source-index.json}, and MJ PDF uses this synchronized allowlist to show only source-linked PDFs in the Library tab and to prevent unmatched PDFs from requesting a targeted rebuild.}{}
+\agentProposedEdit{agent-remove-ee7a50b3-fa50-435c-887e-49f1362045b6}{use the canonical Android application name}{The renderer atomically publishes \path{current_pdfs/.thoughts-source-index.json}, and Thoughts on Android uses this synchronized allowlist to show only source-linked PDFs in the Library tab and to prevent unmatched PDFs from requesting a targeted rebuild.}{}
+\agentProposedEdit
+  {agent-add-ac6f502a-e162-5a44-a0b5-e7d63e9a6148}
+  {Add this agent-authored block for review.}
+  {}
+  {The renderer atomically publishes \path{current_pdfs/.thoughts-source-index.json}, while the Library index contains both source-linked canonical PDFs and unlinked imported PDFs and exposes build actions only for entries with authoritative source metadata.}
+
+\subsection*{Retired incoming-version workflow}
+The former \code{incoming_pdfs/} phone-to-Mac folder, PDF conflict-copy grouping, and \code{docs-review-pdfs} Syncthing relation are retired.
+\agentProposedEdit{agent-remove-f282a9da-e855-5919-a328-0d7b72075b4f}{the server operation log now synchronizes comments}{The phone synchronizes comments through canonical JSONL sidecars instead of returning edited PDF versions.}{}
+The old Mac directory remains only as an unsynchronized recovery archive; retirement does not delete its contents.
+\agentProposedEdit{agent-remove-6ae11c28-a703-4ffb-97c3-b16cf0f24276}{replace the former Android application name}{MJ PDF likewise omits \code{.stversions} and \code{*.sync-conflict-*} recovery copies inside \code{docs-clean-pdfs} from its catalogue, while leaving those files intact.}{}
+\agentProposedEdit
+  {agent-add-9bf167cd-a146-5e02-9460-f6069f885797}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Android likewise omits \code{.stversions} and \code{*.sync-conflict-*} recovery copies inside \code{docs-clean-pdfs} from its catalogue, while leaving those files intact.}
+
+\section*{Comments and automatic saving}
+\phantomsection
+\label{sec:comment-sidecars}
+\agentProposedEdit{agent-remove-827be482-164f-4a26-b8b8-5910989867a0}{the Fedora server now owns the authoritative mutable projection and the local folder is a materialized view}{The root \code{comments/} folder is the authoritative comment store.}{}
+\agentProposedEdit
+  {agent-add-132886c2-d89c-58b4-956a-b43aee33d823}
+  {Add this agent-authored block for review.}
+  {}
+  {PostgreSQL is the authoritative comment and review projection, and the root \code{comments/} folder is its Mac materialization for interoperability, recovery, source anchoring, and PDF publication.}
+For \path{current_pdfs/<pdf-stem>.pdf}, its canonical records live at:
+\begin{DocCode}
+comments/<pdf-stem>_comments.jsonl
+\end{DocCode}
+The phone uses the corresponding folder:
+\begin{DocCode}
+/storage/emulated/0/Documents/docs-clean-comments
+\end{DocCode}
+\agentProposedEdit{agent-remove-96eb3f15-6bc1-51a9-b3e2-6999cc512668}{the Fedora API replaces this relation}{Syncthing maps these two comment folders directly and independently from the PDF folder.}{}
+\agentProposedEdit{agent-remove-b1f5be2b-8327-5019-8ee9-c7307e09ebb9}{the operation log now exchanges these records}{Only the canonical \code{*_comments.jsonl} files, \path{review_resolutions.jsonl}, and conflict archives are exchanged with the phone.}{}
+Mac-only \code{.state}, source-layout, provenance, and SyncTeX cache data remain local.
+\agentProposedEdit
+  {agent-add-0f6f7804-d173-5947-aefe-0dce849690c3}
+  {Add this agent-authored block for review.}
+  {}
+  {Clients append local mutations to crash-safe outboxes and exchange them with the authenticated Fedora API during explicit synchronization.
+The server applies accepted operations transactionally, advances projections and frontiers, and returns materialized comment, review, source, and Library state to each client.
+Atomic local writes, explicit flushes, operation identifiers, revisions, and tombstones make retries idempotent without a normal Syncthing transport.}
+
+\subsection*{Sidecar-first behavior}
+In software tooling, “sidecar” is common for a companion metadata file kept next to the primary artifact (like a PDF, video, or image).
+In our case PDFs files only for the user display, while the comment system is defined in the sidecar.
+\agentProposedEdit{agent-remove-86130c92-450a-4a3e-9f1c-d1babe3b68d7}{replace the former Android application name}{MJ PDF applies the canonical sidecar when a document opens, observes the open sidecar and public resolution registry for changes, and atomically rewrites the sidecar after every comment mutation.}{}
+\agentProposedEdit
+  {agent-add-69bb3ef2-920c-5c8d-805c-c8b00247d1a9}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Android applies its local materialized sidecar when a document opens, records every comment mutation durably, and updates the materialized view while the Fedora operation remains queued for the next sync.}
+The write uses a temporary file, an explicit flush, and an atomic rename.
+\agentProposedEdit{agent-remove-87d5d3f6-e4bf-4ca2-a411-efceb1e67bf6}{replace the former Android application name}{Until that succeeds, a private recovery journal retains the operation and MJ PDF displays an unsaved warning while retrying.}{}
+\agentProposedEdit
+  {agent-add-095f1d46-7a95-51a7-9058-cd8d2858a565}
+  {Add this agent-authored block for review.}
+  {}
+  {Until that succeeds, a private recovery journal retains the operation and Thoughts Android displays an unsaved warning while retrying.}
+Signatures, form fields, and legacy non-comment highlights continue to use the ordinary PDF Save and Discard controls.
+
+Each JSONL record has a stable annotation \code{id}, page and geometry, subtype, content, author, PDF dates, an \code{in_reply_to} identifier for replies, a revision, an update timestamp, and an origin identifier.
+\agentProposedEdit
+  {agent-add-f30ed079-97d2-5f55-a570-18369741486b}
+  {Add this agent-authored block for review.}
+  {}
+  {JSONL comment schema v5 represents text markup that crosses a PDF page boundary as one logical comment with an ordered \code{fragments} array and stores the normalized full selection in \code{selected\_text}.
+Each fragment stores its own page, rectangle, and quadrilateral geometry, while the top-level \code{page}, \code{rect}, and \code{quad_points} fields mirror the first fragment for compatibility.
+The PDF interoperability copy still contains one page-scoped markup annotation per fragment because PDF annotations belong to individual pages.
+The first physical annotation uses the logical comment identifier and owns the comment text, while continuation annotations use \code{<id>\#oe-fragment-<n>} and have empty contents.
+Thoughts Desktop and Thoughts Android hide recognized continuations from their comment lists, resolve a tap on any fragment to the logical root, and edit or delete the complete group as one comment.
+Publication expands one sidecar record back into all physical PDF fragments, while extraction coalesces that convention again.
+Older independently named page fragments are migrated only when a content-bearing first fragment and blank consecutive continuations have identical creation time, author, markup subtype, and style, touch the corresponding page boundaries, and have no competing match, while ambiguous markup remains unchanged.}
+New writers store \code{created} and \code{modified} as PDF dates with an explicit UTC offset, while \code{updated_at} is an ISO~8601 UTC instant used for conflict ordering.
+For compatibility, a legacy PDF date or ISO timestamp without an offset is interpreted as local wall-clock time on the device reading it.
+\agentProposedEdit{agent-remove-91f192a3-66ae-4899-8727-699f0c71d4d3}{replace the former desktop application name}{Okular Enter displays the creation date above each top-level comment and reply, falling back to the modification date only when creation time is unavailable.}{}
+\agentProposedEdit
+  {agent-add-b7bbab5a-0780-584c-898f-13eedba2dfea}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Desktop displays the creation date above each top-level comment and reply, falling back to the modification date only when creation time is unavailable.}
+A deletion is a durable versioned record with \code{deleted: true} and \code{deleted_at}; absence alone is not interpreted as a deletion.
+\agentProposedEdit{agent-remove-71e3dd4a-aa26-5df4-9347-de801a0c2ca4}{the authoritative operation log prevents Syncthing conflict copies}{When Syncthing creates competing sidecar copies, the synchronizer resolves each stable comment independently by revision, timestamp, and deterministic origin.}{}
+\agentProposedEdit
+  {agent-add-0eaa5d17-b74f-5330-adab-a5d7de5ba63e}
+  {Add this agent-authored block for review.}
+  {}
+  {The Fedora operation log resolves concurrent comment and review records by stable identifier, revision, timestamp, and deterministic origin, while explicit tombstones prevent deleted records from reappearing.}
+\agentProposedEdit{agent-remove-186a37c6-05d7-4d63-bb9d-3054ae556765}{server-side operation history and conflict metadata replace this filesystem-only preservation guarantee}{The losing distinct record is preserved under \path{comments/.conflicts/}.}{}
+
+\subsection*{Desktop PDF edits}
+\agentProposedEdit{agent-remove-594c65b0-8430-5f42-b82c-1306b22ba69d}{desktop comment mutations now bypass PDF Save and use the durable sidecar journal}{Okular Enter converts additions, edits, replies, and deletions from a saved PDF into canonical sidecar revisions.}{}
+\agentProposedEdit{agent-remove-b8c21400-3371-435e-a540-9abf1f24c7ae}{identify the desktop application explicitly}{Thoughts treats each Library PDF generation opened from \path{current_pdfs} as an immutable reading artifact, so a comment mutation never rewrites that PDF.}{}
+\agentProposedEdit
+  {agent-add-309dde73-6121-56e3-8f91-38091455ebf6}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Desktop treats each Library PDF generation opened from \path{current_pdfs} as an immutable reading artifact, so a comment mutation never rewrites that PDF.
+Adding, editing, moving, changing properties, deleting, undoing, redoing, changing priority or location, and attaching a ChatGPT URL all update the in-memory annotation first and use the same durable mutation path.
+The interaction is acknowledged locally after the private append-only journal entry has been flushed and synchronized to disk, while a worker updates the materialized sidecar, queues the durable Fedora operation, and retries remote anchoring asynchronously.
+Every mutation carries the SHA-256 identity of the exact immutable PDF generation that was opened, including when the \path{current_pdfs} link advances to a newer generation.
+A failed journal append reverts the in-memory mutation and reports the error instead of falling back to writing the PDF.}
+\agentProposedEdit{agent-remove-4ab4a19b-20cf-45ba-b7ab-32f1b3394fb3}{replace the retired helper name with the current Thoughts Desktop helper}{For headless pre-render preparation, the renderer invokes the bundled native command:}{}
+\agentProposedEdit
+  {fedora-remove-retired-helper-command-20260825}
+  {Delete the retired Mac pre-render command after Fedora assumed comment preparation in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {
+\begin{DocCode}
+okular-enter-comment-sync prepare-all --docs-root /Users/tbe/Documents/docs
+\end{DocCode}}
+  {}
+\agentProposedEdit
+  {agent-add-6d6109c9-1208-58b2-86bd-2316ec9ad3ae}
+  {Retire the pending Mac helper command after Fedora assumed preparation in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {}
+The PDF must be the one canonical file directly inside \code{current_pdfs/}; version and incoming-folder aliases are rejected.
+Per-source observations under \code{comments/.state/} remain necessary to distinguish a real PDF deletion from a companion comment that the PDF never contained.
+\agentProposedEdit{agent-remove-0dd79bdd-7ae9-5b50-86e5-2bac923b00b2}{desktop comments no longer depend on saving the PDF}{Saving in Okular applies only that PDF source's delta: Android-only sidecar records survive unchanged.}{}
+Both apps observe sidecar changes and update the open comment layer in place, without reloading the PDF.
+
+\subsection*{Source anchoring and rebuilds}
+\label{sec:comment-source-anchoring}
+\agentProposedEdit{agent-remove-7d38a3ae-c88b-43e6-bdfd-5391c9f77c9a}{replace the former desktop application name}{Before compilation, \code{render_all.sh} calls Okular Enter's native helper to reconcile every canonical sidecar and anchor new companion comments against the matching current PDF.}{}
+\agentProposedEdit
+  {agent-add-091ac966-4fb8-5ec4-bcbf-c1254989e845}
+  {Replace the pending legacy-renderer description with the Fedora-owned comment preparation boundary established in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {Before Fedora compilation, the server-native renderer invokes the Thoughts Desktop headless helper to reconcile each materialized sidecar from the exact comment frontier and anchor new Thoughts Android comments against the matching current PDF.}
+The existing SyncTeX and \code{\ReviewAnchor} confidence rules remain in force: only an exact cached build and a unique safe source location may modify a \code{.tex} file.
+The first document-level \code{\docTitle} is a hard floor: a reverse-SyncTeX
+target before it or anywhere inside its complete, possibly multiline command
+is anchored immediately after its closing line, never above the title.
+This rule is shared by interactive saves, pre-render preparation,
+generated-source parent fallback, and cross-project source relocation.
+It does not authorize a generic nearest-line fallback; other unsafe
+structural targets remain \code{needs_anchor}.
+When trailing blank page space maps exactly to \code{\textbackslash end\{document\}}, the marker is inserted immediately before that boundary; other environment-ending commands remain unsafe.
+The source marker stores the stable identifier and a readable, one-line,
+LaTeX-safe mirror of the comment.
+\agentProposedEdit{agent-remove-64a2a64a-ad22-4e11-b22d-77723047af5b}{replace the former desktop application name}{The second argument is also an editable comment surface: changing it updates
+the canonical JSONL record and the open Okular annotation, while desktop or
+companion edits update the same argument in the other direction.}{}
+\agentProposedEdit
+  {agent-add-f979ef11-62bb-58d4-95c3-4f072310a24c}
+  {Add this agent-authored block for review.}
+  {}
+  {The second argument is also an editable comment surface: changing it updates the local materialized JSONL record and the open Thoughts Desktop annotation, then queues the durable server operation.}
+\agentProposedEdit{agent-remove-5f34d223-8cf9-4b57-9ef4-e69e080c95e3}{the server projection is authoritative and resolves synchronized operations instead of favoring a canonical local JSONL file}{Native reconciliation remembers the last common revision.  If both sides
+changed before synchronization, the later edit wins; timestamp ties favor the
+canonical JSONL record.}{}
+\agentProposedEdit
+  {agent-add-e75166b2-612f-516b-a5ce-ab016fdaa351}
+  {Add this agent-authored block for review.}
+  {}
+  {Local reconciliation retains the last common revision, while the authoritative server resolves synchronized operations by stable identifier, revision, timestamp, origin, and explicit tombstone.}
+Because the macro ignores its second argument, the renderer's semantic input
+cache also ignores changes only inside that argument: comment edits still
+republish PDF annotations, but do not cause an unnecessary LaTeX compilation.
+Changing the identifier, moving the marker, or changing any ordinary TeX still
+invalidates the build.
+\agentProposedEdit{agent-remove-8ae366b9-8c99-4d6d-a769-10b91760b06c}{replace the former Android application name}{MJ PDF text selection and highlighting may cross consecutive PDF page
+boundaries.  One logical highlighted comment is stored as ordered page
+fragments, while copy and comment actions preserve the selected text in
+document order.
+
+For a safely and uniquely mapped highlighted comment, the source anchor wraps
+the complete corresponding authored TeX as
+\code{\textbackslash ReviewAnchor\{id\}\{comment\}\{highlighted TeX\}}.
+The first two arguments retain the stable identifier and editable comment
+mirror, and the third group renders the wrapped source unchanged.  Sticky-note
+comments keep the standalone two-argument form.  If the selected text cannot
+be matched uniquely and safely---for example across different source files,
+inside verbatim content, or through unbalanced TeX---the synchronizer retains a
+nearby standalone anchor with \code{anchor\_kind:
+standalone\_fallback}.  Deleting or moving a wrapped comment removes only the
+wrapper and preserves its third-argument TeX.}{}
+\agentProposedEdit
+  {agent-add-86bf05f9-c8e2-559f-bd47-9c76986d9e6e}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Android text selection and highlighting may cross consecutive PDF page boundaries.
+One logical highlighted comment is stored as ordered page fragments, while copy and comment actions preserve the selected text in document order.
+For a safely and uniquely mapped highlighted comment, the source anchor wraps the complete corresponding authored TeX as \code{\textbackslash ReviewAnchor\{id\}\{comment\}\{highlighted TeX\}}.
+The first two arguments retain the stable identifier and editable comment mirror, while the third group renders the wrapped source unchanged.
+Sticky-note comments keep the standalone two-argument form.
+If the selected text cannot be matched uniquely and safely, such as across different source files, inside verbatim content, or through unbalanced TeX, the synchronizer retains a nearby standalone anchor with \code{anchor\_kind: standalone\_fallback}.
+Deleting or moving a wrapped comment removes only the wrapper and preserves its third-argument TeX.}
+During publication, layout mapping and named destinations relocate anchored comments, then \code{publish_pdf_comments.py} materializes the live sidecar records into the freshly rendered PDF.
+The publisher never extracts comments from the previous PDF and never uses a duplicate \code{.base} JSONL snapshot.
+\agentProposedEdit
+  {agent-add-b84ec1a5-3aee-55bb-8d4b-9d26daabce43}
+  {Add this agent-authored block for review.}
+  {}
+  {The live records used for publication are the server-authoritative projection materialized into the build's exact comment frontier.}
+\agentProposedEdit{agent-remove-f1cbb761-240e-4aa8-b4f2-de0dfbbbf058}{replace the former Android application name}{Reply relationships are written as standard PDF \code{/IRT} links so MJ PDF and external readers display the same threads.}{}
+\agentProposedEdit
+  {agent-add-117fee16-3e1e-5569-9da6-80071040734c}
+  {Add this agent-authored block for review.}
+  {}
+  {Reply relationships are written as standard PDF \code{/IRT} links so Thoughts Android and external readers display the same threads.}
+
+Removing the unique \code{\ReviewAnchor} of a previously anchored comment is the source-side resolution operation.
+Both the native Save path and the pre-render sidecar preparation path convert that removal into a revisioned \code{deleted: true} record and a public source-resolution record.
+The shared registry is stored at \path{comments/review_resolutions.jsonl} and uses the same revision, timestamp, origin, conflict-reconciliation, and atomic-write rules as document sidecars.
+The resolution suppresses the same annotation from stale PDF copies on both Mac and Android, irrespective of their annotation timestamp; future publications include only surviving live records.
+The operation is conservative when the recorded source is missing or unreadable, the comment was never anchored, or the identifier still appears in any managed source file.
+\agentProposedEdit
+  {agent-add-d571126b-ce27-5b20-807c-518012516d80}
+  {Add this agent-authored block for review.}
+  {}
+  {While a canonical PDF is open, Thoughts Desktop watches the marker-eligible \code{.tex} inputs recorded by the PDF layout and exact build mapping, with each anchored comment's \code{tex_file} as a fallback.}
+A debounced native source-only reconciliation runs off the UI thread after an editor saves one of those inputs; it writes any resulting tombstone and refreshes the annotation in place without saving or reloading the PDF and without starting a Python or background watcher process.
+Atomic editor replacements are supported by also monitoring the source directories, and moved markers are found conservatively across managed sources before any deletion is accepted.
+\agentProposedEdit
+  {agent-add-b9bd0c54-3273-536c-bb1b-767bac485a3b}
+  {Add this agent-authored block for review.}
+  {}
+  {Source changes made while Thoughts Desktop is closed are reconciled when the matching canonical PDF is next opened or rendered.}
+The repository-wide pre-render helper additionally migrates comments when a
+source itself moves between projects.
+A unique existing marker is definitive; for an unanchored comment whose
+recorded source disappeared, the helper uses the cached exact-build source and
+requires its normalized five-line window---the target plus up to two nonblank
+lines on either side---to occur exactly once in the current managed source
+tree.
+It inserts the marker, transfers the live record to the destination PDF's
+sidecar, and leaves a document-local \code{source_moved} tombstone in the old
+sidecar so a stale old PDF cannot resurrect the comment.
+That tombstone is deliberately excluded from
+\path{comments/review_resolutions.jsonl}, because the stable comment remains
+live at its new location.
+Missing, unsafe, or ambiguous destinations remain \code{needs_anchor};
+they are not treated as operational failures and do not stop other projects
+from compiling.
+
+
+\agentProposedEdit
+  {fedora-native-renderer-architecture-20260824}
+  {Replace the obsolete Mac renderer instructions with the canonical TeX-closure Fedora architecture from Codex conversation hash 01a03d38-a300-7be1-ac03-4b540a4f117d.}
+  {\section*{Compiling into PDF}
+Individual PDFs are named \code{<project>_<tex-file>.pdf}, and the combined PDF is named \code{<project>_combined.pdf}.
+Here, \code{<project>} is the part of the repository name that follows \code{docs-}.
+
+\section*{Compiling all docs}
+\begin{DocCode}
+  bash tools/render_all.sh [--fix] [--commit] [--do-not-retain-comments]
+\end{DocCode}
+This script regenerates renderable files in every standard \code{docs-*} repository that contains a \code{tex/source/} folder.
+Generated PDFs are written to each project's \code{pdf/} folder.
+A copy of each combined PDF is written to \code{current_pdfs/}.
+To exclude an entire project, add its exact folder basename, such as \code{docs-example}, to \path{tools/render_skip_projects.txt}.
+Blank lines and comment lines are ignored; paths and glob patterns are rejected.
+A skipped project is omitted from compilation, link processing, PDF combination, \code{current_pdfs/} publication, and Drive synchronization, while its existing PDFs remain untouched.
+The skip file is user-managed and is never reconciled or rewritten by the renderer.
+This is separate from each project's \code{tex/docs_order_manifest.txt}, which controls document order inside an included project and does not exclude omitted source files.
+By default, comments are retained when replacing a combined PDF in \code{current_pdfs/}.
+The publication flow reads only \path{comments/<pdf-stem>_comments.jsonl}, relocates its anchored live records, and embeds them into the freshly generated PDF.
+The authoritative sidecar is never reconstructed from the prior PDF.
+
+When \code{--fix} is supplied, the complete render first runs normally without Codex.
+If any stage fails, one Codex session is launched from the docs root with the failure log and the same command without \code{--fix}.
+Codex repairs the problem, reruns the complete command, and continues through subsequent failures until the command succeeds.}
+  {\section*{Fedora PDF builds}
+The Mac publishes editable files from the selected project's source frontier and uploads only missing content-addressed objects from its \path{tex/assets/}, \path{tex/generated/}, and explicit global-PDF dependencies.
+The local source-manifest schema groups authored files by authoritative Library project and role, and deleting an authored file publishes a tombstone instead of retaining a historical union.
+Each build-input snapshot uses schema version three with discovery policy \code{tex-closure-v1} and records the target, project, relative path, SHA-256 digest, size, media type, and role of every object.
+Legacy source manifests and build-input snapshots remain readable during the transition, but only the canonical policy may create a new active snapshot after migration.
+Fedora materializes the captured source frontier and exact content-addressed objects into an isolated per-job workspace without scanning Git, another project, or any \path{third_party/} tree.
+The server invokes \code{latexmk}, \code{qpdf}, SyncTeX, link rewriting, comment publication, and per-publication source-artifact generation directly from Python orchestration.
+Fedora aggregates every recorder produced for the canonical combined target and verifies every project-local input against the authorized source frontier and snapshot.
+Fedora also verifies that every declared asset or generated object was consumed and that no compiler input escaped the selected project or approved external-PDF registry.
+Closure failures stop before publication with stable codes including \code{project_layout_invalid}, \code{undeclared_build_input}, \code{unused_tex_input}, and \code{cross_project_build_input}.
+Each successful publication stores the verified closure identity, input count, input bytes, captured source frontier, snapshot identity, and build identity.
+Individual PDFs are named \code{<project>_<tex-file>.pdf}, and the combined Library PDF is named \code{<project>.pdf}.
+A PDF becomes publishable only after compilation, closure verification, structural validation, comment and source provenance generation, and object-store ingestion all succeed.
+Successful workspaces are deleted immediately, while failed workspaces are retained for seven days for diagnosis.
+Normal Desktop and Android builds use \code{repair_mode=none}, never commit or push, and preserve the last-good Library generation after a failure.
+The Mac has no authoritative local compile path and does not publish from project \path{build/}, project \path{pdf/}, or a shared writable PDF directory.}
+\agentProposedEdit{agent-remove-d86aa815-4539-45af-b57d-3fd0b0754927}{replace the former desktop application name}{Okular Enter's desktop F5 action uses \code{--fix --pdf <current-pdf>}: the ordinary targeted refresh remains the first attempt, while a failure automatically invokes \code{gpt-5.6-luna} with medium reasoning and permits the minimum relevant source repair.}{}
+\agentProposedEdit{agent-remove-e08ceddd-9f42-4731-ac42-eaf2c81098c7}{plain F5 has no binding and normal Fedora builds never perform automatic source repair}{F5 does not pass \code{--commit}; any automatic source changes remain visible and uncommitted for review.}{}
+\agentProposedEdit{agent-remove-50cc7ec6-4471-41b6-9841-0807883b5a92}{the authenticated server API replaces phone render requests and normal builds use repair mode none}{The phone-request renderer deliberately continues without \code{--fix}, so a phone request never grants an unattended agent permission to edit Mac sources.}{}
+\agentProposedEdit
+  {agent-add-83b229c6-a46c-5cb2-a157-bb8651d7004f}
+  {Add this agent-authored block for review.}
+  {}
+  {Normal Desktop and Android build actions submit \code{repair_mode=none}, never commit or push, and preserve the last-good PDF if the build fails.
+Codex repair is a separate opt-in recovery action that first verifies the latest failed or attention status and requires explicit user approval.}
+When \code{--commit} is supplied, changes are committed and pushed using \path{push_submodule_changes.sh}.
+When \code{--do-not-retain-comments} is supplied, comments already present in \code{current_pdfs/} are not retained.
+
+
+\section*{General script prompt}
+Long-running scripts should display a progress bar, or same a log somewhere (like WandB).
+
+
+\section*{Git submodule shortcuts}
+This section provides shortcuts for pulling and pushing a Git repository together with all nested submodules.
+This is useful because each notes project is a separate Git repository, and some projects may contain their own submodules.
+\agentProposedEdit{agent-remove-8616cb2f-11a1-51a4-98df-4e461580a410}{inconsistent with the non-git docs-root fallback}{Both shortcuts assume that the main repository and all submodules use the \code{main} branch and have an upstream remote configured.}{}
+
+\section*{Writing LaTeX documents}
+Each \code{.tex} file should begin with a short overview before presenting implementation details.
+\agentProposedEdit
+  {agent-add-2293b847-348d-525f-8856-3c896bc73223}
+  {Add this agent-authored block for review.}
+  {}
+  {The LaTeX commands \code{\textbackslash IfFileExists} and \code{\textbackslash InputIfFileExists} are not allowed in any \code{docs-*} project; required files must be referenced directly, and unavailable generated artifacts must be represented by ordinary placeholder content rather than conditional file-existence branches.
+Every multi-section document must provide a useful PDF outline, using the automatic bookmarks from numbered headings and a unique \code{\pdfbookmark} before every starred heading.
+Use bookmark level 0 for the document title, level 1 for sections, level 2 for subsections, and level 3 for subsubsections, and keep destination identifiers stable and unique within the PDF.}
+\agentProposedEdit
+  {grouped-pdf-outline-hierarchy-20260825}
+  {Document the renderer-wide combined-PDF outline hierarchy and its stable title override registry so Desktop and Mobile expose the same document boundaries; prepared in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {Every combined Library PDF exposes each concatenated document as a bold, initially collapsed top-level PDF outline entry.
+The component's existing bookmarks are nested under that entry without changing page destinations or the visible PDF pages.
+The renderer resolves each group title from an explicit override, the source document title, PDF metadata, a sole document-root bookmark, or a readable filename fallback, in that order.
+Stable overrides for sources and third-party PDFs are stored in \path{library/document-outline-titles.json}.}
+We follow the conventions in
+\TexLink{docs-concepts/writing.tex}{doc:writing-style}{the writing style guide}.
+
+\subsection*{Pull latest commits in the main repository and all submodules}
+Use this script to move the main repository and every nested submodule to the latest commit on \code{main}, then record the updated submodule commits in their parent repositories.
+The script is \code{pull_update_submodules.sh}:
+\begin{DocCode}
+msg="Update submodules"
+
+git pull --ff-only
+git submodule update --init --recursive
+
+git submodule foreach --recursive '
+git checkout main
+git pull --ff-only
+git submodule update --init --recursive
+'
+
+git submodule foreach --recursive '
+git add -A
+git diff --cached --quiet || git commit -m "$msg"
+git push
+'
+
+git add -A
+git diff --cached --quiet || git commit -m "$msg"
+git push
+\end{DocCode}
+
+\subsection*{Add, commit, and push changes in all submodules}
+Use this script when changes in the main repository or any nested submodule must be committed and pushed separately.
+Each submodule is committed and pushed first; the parent repository then records the updated submodule commits and is pushed last.
+The script is \code{push_submodule_changes.sh}:
+\begin{DocCode}
+msg="Update docs"
+
+git submodule foreach --recursive '
+git checkout main
+git add -A
+git diff --cached --quiet || git commit -m "$msg"
+git push
+'
+
+git add -A
+git diff --cached --quiet || git commit -m "$msg"
+git push
+\end{DocCode}
+
+The submodules are handled first because the parent repository only records the commit currently checked out inside each submodule.
+
+
+\end{document}

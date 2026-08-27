@@ -1,0 +1,58 @@
+\begin{document}
+\docTitle{Running services}
+
+This page lists the components that are expected to run or be maintained on the MacBook.
+
+\paragraph{Tailscale}
+On the MacBook, a userspace \code{tailscaled} daemon is managed by the \path{io.tailscale.tailscaled.userspace} LaunchAgent.
+It allows different nodes to communicate through a private VPN.
+Additional information is available in the \emph{Tailscale setup} document.
+
+\paragraph{Local Codex session search}
+The \code{search-in-the-past} workflow runs locally on the MacBook.
+It does not depend on OpenSearch, a remote Linux node, or a tailnet search service.
+The raw Codex session files at the following locations remain the source of truth:
+\begin{itemize}
+    \item \code{/Users/tbe/.codex/sessions}
+    \item \code{/Users/tbe/.codex/archived_sessions}
+\end{itemize}
+
+The \code{session-search} command maintains a local SQLite FTS5 index stored at:
+\begin{DocCode}
+~/.codex/local-session-search/session-search.sqlite
+\end{DocCode}
+The directory and database are restricted to the current macOS user.
+The index stores extracted messages and short conversation segments with metadata such as the timestamp, role, current working directory, session ID, absolute source-file path, and source line number.
+Conversation, developer, system, and supported tool records are indexed; normal searches query only user and assistant messages.
+Tool calls, tool output, commands, errors, and developer or system messages require the explicit \code{tools} or \code{all} search mode.
+
+\paragraph{Index refresh and verification}
+Every normal search first performs an incremental refresh.
+The refresh scans the two local session roots, skips unchanged \code{rollout-*.jsonl} files, reads only newly appended bytes when possible, fully reindexes rewritten files, and removes derived records for deleted source files.
+No background daemon is required.
+
+Common commands are:
+\begin{DocCode}
+session-search stats
+session-search search 'prior decision'
+session-search search 'pytest failure' --mode tools
+session-search verify 'exact phrase'
+session-search rebuild
+\end{DocCode}
+
+The raw JSONL files remain authoritative.
+When a search result is used to establish what was decided, what was completed, or what remains unfinished, it must be verified against the raw JSONL file and line number.
+
+The \code{verify} command uses ripgrep for exact fixed-string searches.
+Its direct equivalent is:
+\begin{DocCode}
+rg -n -F --glob 'rollout-*.jsonl' '<exact text>' \
+  /Users/tbe/.codex/sessions \
+  /Users/tbe/.codex/archived_sessions
+\end{DocCode}
+
+\paragraph{Out of scope}
+This implementation does not require a daemon, Spotlight indexing, OpenSearch, Tantivy, embeddings, or queries to another machine.
+The infrastructure consists of a local SQLite FTS5 file and raw \code{rg -F} verification.
+
+\end{document}

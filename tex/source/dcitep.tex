@@ -1,0 +1,17 @@
+\begin{document}
+\docTitle{Extended-related-work citations}
+\agentProposedEdit{agent-remove-99561910-c60e-504c-958a-46e2b76b569f}{retired Dcitep mechanism}{Use \code{\Dcitep{bibKey}} to render and register a normal numeric citation whose link prefers the workspace's canonical related-work destination.}{}
+\ReviewAnchor{mjpdf-6a79a3f7-2e26-4204-a9f4-1f69767c8252}{Remove}%
+\agentProposedEdit{agent-remove-5077f0f4-53b7-5fec-8984-a58727aabaff}{retired Dcitep mechanism}{The command also accepts the same one-note and two-note forms as \code{\citep}.}{}
+\agentProposedEdit{agent-remove-091b01be-249e-50d4-ab4c-7b74160279b6}{retired Dcitep mechanism}{Canonical destinations are declared in the versioned registry at \path{tools/latex/dcite_targets.json} using a document selector and an existing LaTeX label.}{}
+\agentProposedEdit{agent-remove-3c70acdb-276c-566c-a96d-aa87b2f93c71}{retired Dcitep mechanism}{The registry is workspace-global, so a citation in any project can jump to one canonical discussion in another project.}{}
+\agentProposedEdit{agent-remove-b2cb4642-c4c1-5365-97de-6a1fde9f3eae}{retired Dcitep mechanism}{When no registry entry exists, the renderer uses \path{third_party/pdfs/bibKey.pdf} and appends that paper once to the combined PDF.}{}
+\agentProposedEdit{agent-remove-917b6b63-1d92-5038-aa25-5da81e41d257}{retired Dcitep mechanism}{The build fails when neither a registry entry nor the key-named fallback PDF exists.}{}
+\agentProposedEdit{agent-remove-aedcfb26-4cdb-5b91-a8c3-1c8e5794dd88}{retired Dcitep mechanism}{Each \code{\Dcitep} accepts exactly one BibTeX key because its visible marker has exactly one navigation destination.}{}
+\agentProposedEdit{agent-remove-d212f10c-7425-5b6c-9aaa-03b8afacf895}{retired Dcitep mechanism}{Use ordinary \code{\citep} for grouped citations and for citations that should continue to link to the bibliography.}{}
+\agentProposedEdit
+  {agent-add-a20d5fcf-aa99-5f1e-97ea-a99db3349530}
+  {Add this agent-authored block for review.}
+  {}
+  {Use \code{\citep} or \code{\citet} for attribution, \code{\TexLink} for maintained workspace sources, and \code{\PdfLink} for exact locations in source-less third-party PDFs.}
+\end{document}

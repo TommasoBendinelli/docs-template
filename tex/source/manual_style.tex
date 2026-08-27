@@ -1,0 +1,270 @@
+\begin{document}
+\docTitle{Custom commands in manual\_style}
+\phantomsection
+\label{doc:manual-style}
+\ReviewAnchor{mjpdf-922d6876-a70a-4ed2-931e-7f0c60c8aa8a}{We use a combination of standard and custom commands...}{This documents describes custom shared LaTex commands available for the note syst}ems. 
+\agentProposedEdit{agent-remove-6b31f515-6699-4f66-81bb-8ac1de88d391}{each project now owns the style used by its active TeX dependency graph}{These commands are implemented through the file \path{tools/latex/manual_style.sty}, the shared package loaded by the standard renderer.}{}
+\agentProposedEdit{agent-remove-a792028b-e21b-4f25-a910-450a773f851b}{this document now describes the project-local style instead of the retired workspace-wide path}{This document is the public command reference for \path{tools/latex/manual_style.sty}.}{}
+\agentProposedEdit
+  {agent-add-fb7f7740-c63c-5b6f-a5f9-bfc122e0ffd5}
+  {Add this agent-authored block for review.}
+  {}
+  {For \code{docs-template}, these commands are implemented by the project-owned package at \path{tex/support/manual_style.sty}.
+Every active \code{docs-*} project must load its own required style from \path{tex/support/} so the exact build input can be captured, hashed, published, and reconstructed independently.}
+
+\phantomsection
+\section*{Linking}\label{sec:manual-style-tex-link}
+\subsection*{Within Tex documents}
+Use the standard \code{.tex} command
+
+\begin{DocCode}
+\hyperref[sec:parallel-execution]{the Parallel Execution section}
+\end{DocCode}
+
+Define the target as:
+
+\begin{DocCode}
+\phantomsection
+\subsection*{Parallel Execution}
+\label{sec:parallel-execution}
+\end{DocCode}
+
+\subsection*{To a different .tex documents}
+Use \code{\TexLink}.
+Creates a link to a labelled location in another renderable source document.
+Its arguments are the logical target \code{docs-project/file.tex}, the target's LaTeX label, and the visible link text.
+
+\begin{DocCode}
+% In docs-concepts/tex/source/sdpo.tex:
+\phantomsection
+\subsection*{Implementation details}
+\label{sec:sdpo-implementation}
+
+% In another source document:
+\TexLink
+  {docs-concepts/sdpo.tex}
+  {sec:sdpo-implementation}
+  {the SDPO implementation section}
+\end{DocCode}
+
+The selector is intentionally independent of the generated PDF filename.
+The target must be a standalone source under the selected project's \path{tex/source/} folder, and its label must exist in the rendered \code{.aux} file.
+Use \code{\phantomsection} before a labelled unnumbered heading so the link resolves to the heading's location.
+The standard renderer turns the link into an exact external jump in an individual PDF.
+For a combined PDF, it appends a cross-project target once and converts the link into an internal jump.
+Use \code{\href} for ordinary web URLs and \code{\TexLink} for links between documents.
+Do not use the \code{run:} prefix: it creates an application-launch action that many PDF viewers block.
+
+\subsection*{To a PDF document with no .tex}
+Use \code{\PdfLink}.
+The PDF must be located at PDF stored directly in the workspace-global \path{third_party/} folder.
+The paper key is the PDF filename without its \code{.pdf} suffix, and the anchor name identifies one annotation whose complete comment is \code{doc-anchor:anchorName}.
+\agentProposedEdit
+  {agent-add-f982447d-06af-5a67-b1d6-5305bab41bed}
+  {Add this agent-authored block for review.}
+  {}
+  {The PDF filename must start with a letter or digit and otherwise contain only letters, digits, dots, underscores, or hyphens.}
+\agentProposedEdit{agent-remove-e4186ade-9a4b-464c-95c0-8d58f1a988c1}{replace the former Android application name}{The MJ PDF \textbf{Put in Library} workflow enforces this filename rule and preserves the imported PDF in the workspace-global \path{third_party/} folder.}{}
+\agentProposedEdit
+  {agent-add-3900fb10-2e1c-5a8e-977c-9ffebf830230}
+  {Add this agent-authored block for review.}
+  {}
+  {The Thoughts Android \textbf{Put in Library} workflow enforces this filename rule and preserves the imported PDF in the workspace-global \path{third_party/} folder.}
+The renderer jumps to the annotation geometry in an individual PDF and preserves the exact position after appending the paper to a combined PDF.
+\agentProposedEdit
+  {agent-add-29471f31-0fcc-5296-af27-4f7e711e24eb}
+  {Add this agent-authored block for review.}
+  {}
+  {A combined PDF appends each referenced \code{\PdfLink} target and each cross-project \code{\TexLink} target once, while same-project \code{\TexLink} targets are already present in manifest order.}
+Use \code{\TexLink} with a LaTeX label whenever the target has renderable workspace source.
+
+
+\ReviewAnchor{mjpdf-256f2140-6cbd-4f02-8df7-760c7167cadb}{Add quotes?}%
+\section*{Document title and source name}
+
+\paragraph{\code{\docTitle}.}
+Sets the document name used in the page header, configures the header and footer, enables configured line numbering, and normally prints a centered title.
+An optional first argument supplies a shorter header name.
+
+\begin{DocCode}
+\docTitle{Full document title}
+\docTitle[Short header]{Full document title}
+\end{DocCode}
+
+\paragraph{\code{\code}.}
+Prints literal inline text in a monospaced font without interpreting LaTeX commands inside the argument.
+
+\paragraph{\code{DocCode}.}
+A verbatim block for commands, paths, logs, and source examples.
+Long lines may wrap.
+When document line numbers are enabled, its numbering continues from the surrounding document.
+Commands written inside this environment are displayed, not executed.
+\agentProposedEdit
+  {agent-add-5179bacf-5ee5-5414-b275-29929868ad28}
+  {Add this agent-authored block for review.}
+  {}
+  {Use \code{\begin{DocCode}[numbered]} to display independent one-based line numbers for one block in every PDF while leaving plain blocks unnumbered.}
+
+\paragraph{\code{LinkedDocCode}.}
+A verbatim-style block that keeps long lines unwrapped and enables backslash and braces as command characters.
+This allows selected pieces of a displayed line to contain active LaTeX formatting or links.
+It shares the continuous line-number behavior of \code{DocCode}.
+\agentProposedEdit
+  {agent-add-d36f3ba3-95bb-5ac1-b95c-6f83e0ad36f8}
+  {Add this agent-authored block for review.}
+  {}
+  {The same opt-in syntax is available as \code{\begin{LinkedDocCode}[numbered]}.}
+
+\begin{LinkedDocCode}
+docs-concepts/tex/source/
+|-- \TexLink{docs-concepts/sdpo.tex}{sec:sdpo-implementation}{sdpo.tex}  \textit{(linked target)}
+`-- README.md
+\end{LinkedDocCode}
+
+\paragraph{\code{DocComment}.}
+Formats a short document comment as a small gray italic quotation prefixed with ``Comment.''
+
+\section*{Source-level review anchors}
+\label{sec:manual-style-review-anchor}
+
+\paragraph{\code{\ReviewAnchor}.}
+Defines the source-level marker used by the SyncTeX comment-anchoring workflow.
+\agentProposedEdit{agent-remove-1903a283-fb52-463c-bb93-3091570ff1e2}{the active command is provided by each project's exact project-owned style input}{The command is implemented in \path{tools/latex/manual_style.sty} and is available to every standard \code{docs-*} source rendered through the shared package.}{}
+\agentProposedEdit
+  {agent-add-8ee596b4-e22e-500e-b839-e6136fd26c7a}
+  {Add this agent-authored block for review.}
+  {}
+  {The command is implemented in this project's \path{tex/support/manual_style.sty}, and other standard projects provide the same interface from their own project-owned support package.}
+
+The command takes a stable comment identifier followed by a readable mirror of
+the actual comment:
+\begin{DocCode}
+\ReviewAnchor{example-comment-id}{The system should regenerate all PDFs.}%
+The system periodically regenerates all PDFs.
+\end{DocCode}
+
+The command must produce no visible text and must not alter spacing or line breaking.
+During compilation it emits a uniquely named PDF destination at its source position.
+The comment extraction and retention tools use that destination to recreate the associated PDF annotation after text reflows, paragraphs move, or earlier pages are added or removed.
+
+The second argument is a one-line, LaTeX-safe editable comment for people
+reading the source; it produces no output.
+Whitespace is collapsed, but the text is not truncated.
+\agentProposedEdit{agent-remove-30db119b-20a3-4b96-a7cb-c5129878f413}{replace the former desktop application name}{Changing it updates the canonical \path{comments/*.jsonl} record and the open
+Okular annotation; Okular and companion edits update it in the other
+direction.  The JSONL record remains authoritative for author, timestamps,
+annotation style, selected text, source context, and synchronization state.}{}
+\agentProposedEdit
+  {agent-add-7a9f62e5-444b-5514-aef5-84605ced5862}
+  {Add this agent-authored block for review.}
+  {}
+  {Changing it updates the open Thoughts Desktop annotation and the local materialized \path{comments/*.jsonl} record, then queues the corresponding durable operation for the next server synchronization.
+PostgreSQL remains authoritative for mutable comment and review projections, while JSONL records are materialized interoperability, recovery, anchoring, and PDF-publication views.}
+Per-comment common-ancestor metadata resolves simultaneous text edits by
+timestamp, with ties favoring the canonical record.
+
+\agentProposedEdit{agent-remove-73d51495-5ce2-494a-9f03-b5a789d9a426}{replace the former desktop application name}{\code{\ReviewAnchor} markers are inserted by Okular Enter's shared native synchroniser, either during an interactive save or through its headless pre-render helper, rather than written manually.}{}
+\agentProposedEdit
+  {agent-add-2cb85006-529e-5827-9545-49167c170c5a}
+  {Add this agent-authored block for review.}
+  {}
+  {\code{\ReviewAnchor} markers are inserted by the Thoughts Desktop durable mutation worker, the in-process source-anchor watcher, or the shared headless pre-render helper rather than written manually.
+Thoughts Android mutations are synchronized through Fedora and are materialized on the Mac before the same native anchoring rules run.}
+The destination may be any authored \code{.tex} input inside the same \code{docs-*} project when that file is present in the exact build's \code{.fls} manifest; it is not restricted to the top-level \path{tex/source/} wrapper.
+The first document-level \code{\docTitle} after
+\code{\textbackslash begin\{document\}} is a hard placement floor.
+If reverse SyncTeX maps a comment before that title or onto any line occupied
+by the complete title command, including an optional or multiline argument,
+the marker is inserted immediately after the title's closing line.
+No review marker is inserted above \code{\docTitle}.
+Other unsafe structural commands remain \code{needs_anchor}; the synchroniser
+does not search for an arbitrary nearby line.
+Markers are not inserted in generated, build-output, PDF, archive, third-party, or version-control directories.
+Each identifier must occur at most once in the managed source tree.
+Repeated comment extraction must reuse the existing marker instead of creating a duplicate.
+Moving or renaming a source file is safe as long as the unique marker moves with its associated passage.
+During repository-wide preparation, an unanchored comment can also follow a
+missing source into another standard \code{docs-*} project when its exact-build
+snapshot supplies a normalized target-and-context signature that occurs in
+exactly one current managed source.
+The comment keeps its stable identity, receives a marker at the matched
+passage, and moves to the destination project's sidecar; the old sidecar keeps
+only a document-local \code{source_moved} tombstone, not a global resolution.
+An absent or ambiguous match is retained as \code{needs_anchor} and never
+blocks unrelated document rendering.
+After a comment deletion is accepted and recorded as a durable tombstone, its unused marker may be removed.
+
+Removing the unique marker of a previously anchored comment from its recorded, readable, managed \code{.tex} source explicitly resolves that comment.
+The synchronizer writes a durable global tombstone, removes the record from the live sidecar, prevents older PDF copies from restoring it, and omits it from subsequently published PDFs.
+This rule is deliberately guarded: a new or unanchored comment, a missing or unreadable source file, or an identifier that still occurs anywhere in the managed source tree is retained rather than deleted.
+A marker moved with its passage remains anchored; duplicate markers remain an ambiguity and are not interpreted as a deletion.
+For markup annotations such as highlights, the marker locates the relevant neighborhood while stored selected text and context are used to reconstruct the exact marked range.
+
+The full extraction lifecycle, confidence rules, JSONL fields, and orphan policy are documented in
+\TexLink{docs-template/notes_system.tex}{sec:comment-sidecars}{the notes system}.
+
+\section*{Related-work metadata}
+
+\paragraph{\code{\relatedWorkMeta}.}
+\agentProposedEdit
+  {agent-add-9d1cb594-4f0f-5b3f-aac4-33413e63c489}
+  {Add this agent-authored block for review.}
+  {}
+  {Prints the paper title as a paragraph heading and compact metadata from six arguments: a linked italic paper title, citation information, first-online date, venue, repository or source links, and \code{AuthorsFromZH}.}
+
+\begin{DocCode}
+\relatedWorkMeta
+  {\href{https://example.com/paper}{\emph{Example Paper}}}
+  {23 (queried July 14, 2026)}
+  {June 2023}
+  {NeurIPS 2023}
+  {\url{https://example.com}}
+  {-}
+\end{DocCode}
+
+A source that defines its own incompatible \code{\relatedWorkMeta} is detected by the renderer and keeps its local definition.
+
+\section*{Bibliographies}
+
+\agentProposedEdit
+  {agent-add-1e597d8e-fcc8-581e-9060-b49556f2c5aa}
+  {Add this agent-authored block for review.}
+  {}
+  {The current self-contained policy loads the project-owned database at \path{tex/support/references.bib} or the optional machine-produced override at \path{tex/generated/references.bib}.
+Active compilation never obtains a style or bibliography from the workspace-wide \path{tools/latex/} directory.}
+\paragraph{\code{\manualBibliography}.}
+Adds the References section using the standard \code{plainnat} style.
+\agentProposedEdit{agent-remove-bb7d8fc8-732f-4059-98b8-160571c9deb9}{the bibliography database is project-owned rather than loaded from a workspace-wide tools path}{In the normal workspace, it loads the canonical shared database at
+\path{tools/latex/tex/support/references.bib}.}{}
+\agentProposedEdit{agent-remove-0936333d-c1b0-4fff-bebd-c0a374b0e0ee}{the optional generated override now lives under the canonical tex tree}{If the project contains \path{generated/tex/support/references.bib}, it uses that derived,
+self-contained snapshot instead.}{}
+\agentProposedEdit
+  {agent-add-ab815d3d-1373-5699-9f0d-466f939a7218}
+  {Add this agent-authored block for review.}
+  {}
+  {The command loads \path{tex/support/references.bib} or the optional machine-produced override at \path{tex/generated/references.bib}.}
+
+\begin{DocCode}
+% Immediately before \end{document}:
+\manualBibliography
+\end{DocCode}
+
+\agentProposedEdit{agent-remove-2dc7f1c2-a6e0-4964-85da-4842a61d671d}{generated bibliography inputs are project-owned exact build inputs rather than snapshots of a workspace-wide database}{The generated snapshot is intended for exports such as Overleaf and must be refreshed from the shared database rather than maintained independently.}{}
+\agentProposedEdit
+  {agent-add-e1732f1e-3098-5ec4-99df-84382b52f15a}
+  {Add this agent-authored block for review.}
+  {}
+  {A generated bibliography override is refreshed by the project's generator and is captured as an exact managed input whenever the target compiles it.}
+
+\section*{Table column type}
+
+\paragraph{\code{P}.}
+Defines a fixed-width, left-aligned paragraph column for \code{tabular} and related environments.
+
+\begin{DocCode}
+\begin{tabular}{P{0.35\textwidth}P{0.55\textwidth}}
+Left column & Right column \\
+\end{tabular}
+\end{DocCode}
+
+\end{document}

@@ -28,4 +28,5 @@
 # Rendered PDFs
 /pdf/*
 !/pdf/.gitkeep
-manual/comments/__pycache__/pdf_comments.cpython-313.pyc
+comments/__pycache__/pdf_comments.cpython-313.pyc
+/.cache/generation/

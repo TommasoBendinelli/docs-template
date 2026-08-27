@@ -1,0 +1,53 @@
+\begin{document}
+\docTitle{Concept: incremental full-text search}
+
+An incremental full-text search system builds a local, searchable representation of larger source files and updates only the parts that changed.
+In this setup, Codex session JSONL files are the source of truth and SQLite FTS5 is the derived search index.
+
+\paragraph{Data flow}
+\begin{DocCode}
+Codex rollout-*.jsonl files
+          |
+          v
+compare saved file state
+  | unchanged  -> skip
+  | appended   -> read new bytes
+  | rewritten  -> reindex the file
+  | deleted    -> remove derived records
+          |
+          v
+extract messages + metadata
+          |
+          v
+SQLite FTS5 index
+          |
+          v
+ranked search results -> raw JSONL verification
+\end{DocCode}
+
+\paragraph{How it detects new information}
+For every session file, the index stores its path, size, nanosecond modification time, indexed byte position, and a fingerprint of the indexed tail.
+If these values still match, the file has no unindexed bytes and is skipped.
+If the file grew and its indexed prefix still matches, reading resumes at the saved byte position.
+New files are indexed completely, while rewritten or truncated files are rebuilt.
+An incomplete final JSONL line is left pending until the next refresh.
+
+\paragraph{How a search runs}
+A normal \code{session-search} query first performs the incremental refresh and then searches SQLite.
+FTS5 finds matching terms without rescanning the full JSONL corpus, while structured metadata can restrict results by date, role, project directory, session ID, or source path.
+Important findings are checked against the absolute raw file path and line number with \code{session-search verify}.
+
+\paragraph{Properties}
+\begin{itemize}
+    \item \textbf{Local:} session content and the index stay on the MacBook.
+    \item \textbf{Incremental:} unchanged files are skipped and appended files are resumed.
+    \item \textbf{On demand:} refresh happens when a search runs; no daemon is required.
+    \item \textbf{Disposable:} the SQLite database can be rebuilt from the raw JSONL files.
+    \item \textbf{Verifiable:} the index finds candidates, but raw session files remain authoritative.
+\end{itemize}
+
+The system does not understand that a conversation is ``finished.''
+It knows that indexing is current when every discovered source file matches its recorded state.
+Anything written afterward is picked up by the next search or an explicit \code{session-search} refresh.
+
+\end{document}

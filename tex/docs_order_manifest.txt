@@ -1,7 +1,12 @@
-# Render order for PDFs built from manual/src.
+# Render order for PDFs built from tex/source.
 # List one .tex filename per line. Blank lines and comment lines are ignored.
 notes_system.tex
+thoughts.tex
+manual_style.tex
+related_work.tex
+dcitep.tex
 results_guideline.tex
 codex_session.tex
+incremental_full_text_search.tex
 service_running.tex
 tailscale_setup.tex

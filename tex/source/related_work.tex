@@ -1,0 +1,202 @@
+\begin{document}
+\docTitle{Related work, citations, and bibliographies}
+\phantomsection
+\label{doc:related-work}
+
+\agentProposedEdit
+  {agent-add-c8867e37-55e5-514b-8ffb-b991477f0c86}
+  {Add this agent-authored block for review.}
+  {}
+  {The historical shared-bibliography passages in this guide are superseded by the self-contained project policy in \TexLink{docs-template/notes_system.tex}{doc:notes-system}{the notes system}.
+Every project that uses citations owns \path{tex/support/references.bib}, while an optional machine-produced override belongs at \path{tex/generated/references.bib}.
+The files under \path{tools/latex/} are scaffolding templates and are not compilation dependencies of active document projects.}
+
+This guide defines the standard way to describe related work, cite it in the text, and generate a formal References section in a \code{docs-*} project.
+The important distinction is that a related-work note, a citation marker, a bibliography entry, and a citation count are four different things.
+
+\section*{The four pieces}
+
+\begin{enumerate}
+  \item The \textbf{Related work section} is the standard related work of any paper that uses \code{\citep} to cite there.
+  \item A \textbf{Extended related work} is a long per paper description. 
+  \item A full \code{paper_name.tex} is a full paper description. 
+  In case of replication we use this approach.
+  \item A \textbf{BibTeX entry} in \path{tools/latex/tex/support/references.bib} stores the formal bibliographic metadata shared by manual-document projects.
+\end{enumerate}
+
+\section*{Required files}
+
+\agentProposedEdit
+  {agent-add-41e9e8f7-da79-50b3-802a-12e69d9a3444}
+  {Add this agent-authored block for review.}
+  {}
+  {The current required layout uses \path{tex/source/} for standalone entries, \path{tex/fragments/} for included TeX, \path{tex/assets/} for authored binary inputs, \path{tex/support/} for styles and bibliographies, and \path{tex/generated/} for required derived inputs.
+Generator programs live under \path{scripts/}, while fetched data, raw results, temporary intermediates, and unused outputs live under the ignored \path{.cache/generation/} tree.
+The tree below is historical and must not be used for new or migrated projects.}
+A project with conventional citations has this structure:
+
+\begin{DocCode}
+docs/
+|-- tools/
+|   `-- latex/
+|       |-- manual_style.sty
+|       `-- tex/support/references.bib       # canonical shared database
+`-- docs-my-topic/
+    |-- generated/
+    |   `-- tex/support/references.bib       # optional derived snapshot
+    `-- manual/
+        |-- docs_order_manifest.txt
+        `-- src/
+            `-- my_note.tex
+\end{DocCode}
+
+Use \path{tools/latex/tex/support/references.bib} as the source of truth.
+The standard renderer exposes this database to BibTeX for every manual-document project.
+
+A self-contained export, for example an Overleaf project, may include
+\path{generated/tex/support/references.bib}.
+This file is a generated copy of the canonical database, not a second source of truth.
+Update the shared database first and then refresh the snapshot.
+The \code{\manualBibliography} command automatically uses the generated snapshot when it is present and otherwise uses the shared database.
+Standalone publication projects that own their document class and build pipeline may continue to own a project-specific bibliography.
+
+
+\section*{Registering a work in BibTeX}
+
+Add one entry for each distinct work to \path{tools/latex/tex/support/references.bib}.
+For example:
+
+\begin{DocCode}
+@article{kleinebuening2026aligning,
+  author  = {Kleine Buening, Thomas and H{\"u}botter, Jonas and
+             P{\'a}sztor, Barna and Shenfeld, Idan and
+             Ramponi, Giorgia and Krause, Andreas},
+  title   = {Aligning Language Models from User Interactions},
+  journal = {arXiv preprint arXiv:2603.12273},
+  year    = {2026},
+  doi     = {10.48550/arXiv.2603.12273},
+  url     = {https://arxiv.org/abs/2603.12273}
+}
+\end{DocCode}
+
+The text before the first comma, here \code{kleinebuening2026aligning}, is the citation key.
+Use a stable, descriptive key and do not create a second entry merely because the same work is mentioned in another section or source document.
+Prefer metadata from the publisher, proceedings, or official preprint record.
+
+\section*{Extended related work citing mechanism}
+\begin{DocCode}
+\section*{Extended related work}
+
+
+\relatedWorkMeta
+  {\href{https://arxiv.org/pdf/2603.12273}
+    {\emph{Aligning Language Models from User Interactions}}
+  \citep{kleinebuening2026aligning}}
+  {10 (queried July 11, 2026)}
+  {February 2026}
+  {ICML 2026 Workshop on Continual Adaptation at Scale}
+  {\href{https://arxiv.org/abs/2603.12273}{arXiv}}
+  {Thomas Kleine Buening, Andreas Krause}
+
+This paper studies how to align language models directly from multi-turn user interactions. 
+It is relevant here because ...
+\end{DocCode}
+
+\agentProposedEdit{agent-remove-6a8c126e-c81d-5d9e-9714-40d13e67fa86}{inconsistent}{The five arguments of \code{\relatedWorkMeta} are:}{}
+\agentProposedEdit
+  {agent-add-74019616-599b-53d0-8131-4bcdd325565a}
+  {Add this agent-authored block for review.}
+  {}
+  {The command takes six arguments: first the linked italic paper title, followed by the five metadata arguments below in their existing order.}
+
+\begin{enumerate}
+  \item citation count (i.e. how many citations the paper got so far) and query date;
+  \item first-online date;
+  \item venue;
+  \item repository or source links;
+  \item the first author in the author list who is affiliated with a university in Zurich, or \code{-} if none.
+\end{enumerate}
+
+The query date is needed because citation counts change over time.
+
+\phantomsection
+\section*{Information collection method}
+\label{app:related-work-information-method}
+We used Codex to retrieve citation counts from Semantic Scholar and first-online dates from arXiv with the following prompt:
+\begin{DocCode}
+  Find the number of citations for each article using Semantic Scholar, and the first time each article appeared online on arXiv, and update the document.
+\end{DocCode}
+The first-online metadata records the earliest public online date or source date by month and year.
+When a citation count or first-online date could not be found in those sources, the value was completed with ChatGPT and marked with an asterisk.
+
+\section*{Citation commands}
+
+Use the same BibTeX key wherever the work is discussed:
+
+\begin{DocCode}
+% Parenthetical numeric citation: "... supervision [1]."
+Follow-up interactions can provide hindsight supervision
+\citep{kleinebuening2026aligning}.
+
+% Textual citation: "Kleine Buening et al. [1] ..."
+\citet{kleinebuening2026aligning} learn from multi-turn
+user interactions.
+
+% Several references in one marker, compressed when consecutive.
+This observation appears in several studies
+\citep{firstKey,secondKey,thirdKey}.
+\end{DocCode}
+
+Use \code{\citep} for the usual parenthetical marker and \code{\citet} when the authors are part of the sentence.
+Do not type reference numbers such as \code{[1]} manually: numbering can change whenever entries are added or reordered.
+
+\section*{Generating the References section}
+
+Add the following immediately before \code{\end{document}} in every standalone source that uses citations:
+
+\begin{DocCode}
+\manualBibliography
+
+\end{document}
+\end{DocCode}
+
+\code{\manualBibliography} applies the standard \code{plainnat} bibliography style.
+In a normal workspace render, BibTeX resolves \code{tex/support/references.bib} from \path{tools/latex/}.
+If \path{generated/tex/support/references.bib} exists in the project, the command uses that self-contained snapshot instead.
+
+Only entries cited by that source appear in its generated References section.
+An entry that merely exists in the selected database does not appear.
+If an uncited entry must be included intentionally, use:
+
+\begin{DocCode}
+\nocite{citationKey}
+\end{DocCode}
+
+Prefer a natural citation over \code{\nocite} when the work is actually discussed.
+
+\section*{Complete minimal example}
+
+The source file \path{tex/source/my_note.tex} can be as small as:
+
+\begin{DocCode}
+\begin{document}
+\docTitle{My research note}
+
+\section*{Related work}
+
+\paragraph{
+  \emph{Aligning Language Models from User Interactions}
+  \citep{kleinebuening2026aligning}.
+}
+This work uses follow-up interactions as hindsight feedback.
+
+\manualBibliography
+
+\end{document}
+\end{DocCode}
+
+The matching entry must exist in \path{tools/latex/tex/support/references.bib}, or in the derived
+\path{generated/tex/support/references.bib} used by a self-contained export.
+After rendering, the paragraph contains a resolved numeric citation and the end of the PDF contains the generated References section.
+
+\end{document}

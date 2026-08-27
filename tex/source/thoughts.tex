@@ -1,0 +1,709 @@
+\begin{document}
+\agentProposedEdit{agent-remove-3a79f046-0d85-41d3-b22b-847474d60a2f}{replace the former desktop application title}{\docTitle{Okular Enter: Custom PDF Viewer}}{}
+\docTitle[Thoughts Desktop]{\agentProposedEdit
+  {agent-add-59ccfb99-b712-50fe-a6f9-2be4afb6d8f4}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Desktop}}
+\agentProposedEdit{agent-remove-f9a4c59a-2ac1-4b62-ad27-2890b5d5bca8}{use the canonical desktop application name}{The current name of this application and document is Thoughts, while the historical title above is retained under the note-editing policy.}{}
+\agentProposedEdit
+  {agent-add-f609c012-6861-538a-8639-e08db4f9ab51}
+  {Add this agent-authored block for review.}
+  {}
+  {The product is Thoughts, with exactly two applications: Thoughts Desktop for macOS and Thoughts Android.}
+\phantomsection
+\label{doc:thoughts}
+\agentProposedEdit{agent-remove-d67308a5-118c-4e46-acb1-7394a40c375e}{distinguish the application name from its upstream codebase}{This is a custom made fork of Okular.}{}
+\agentProposedEdit
+  {agent-add-3bf25266-8cf1-521c-a0d8-4f7c7d423077}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Desktop is built from a custom fork of the upstream Okular codebase.}
+That introduces all the changes for our PDF system
+\agentProposedEdit{agent-remove-f6d0de43-2757-5467-b3bc-4180f8670963}{replaced by the complete Thoughts identity}{The custom desktop application is now branded as Thoughts and installed at \path{/Applications/Thoughts.app}, while the executable, bundle identifier \code{org.kde.okular.enter}, and \code{okular-enter} URL scheme remain unchanged for compatibility.}{}
+\agentProposedEdit{agent-remove-77af189f-17a8-577e-8204-a3369355611e}{replaced by the complete Thoughts identity}{The Android application uses the same Thoughts name and icon while retaining the package identifier \code{com.gitlab.mudlej.MjPdfReader}.}{}
+\agentProposedEdit{agent-remove-d1c63781-2722-4252-b011-955f30a63604}{use the canonical desktop application name}{The macOS application is installed at \path{/Applications/Thoughts.app}, uses executable \code{thoughts}, bundle identifier \code{org.tbend.thoughts}, URL scheme \code{thoughts}, and helper \code{thoughts-comment-sync}.}{}
+\agentProposedEdit
+  {agent-add-61029074-11b0-54b6-8418-07d890589396}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Desktop is installed at \path{/Applications/Thoughts.app} and uses executable \code{thoughts}, bundle identifier \code{org.tbend.thoughts}, URL scheme \code{thoughts}, and helper \code{thoughts-comment-sync}.}
+\agentProposedEdit{agent-remove-c6574e32-c274-476d-b1a6-b5a1b48caaaf}{use the canonical Android application name}{The Android application uses the fresh package identifier \code{org.tbend.thoughts}, while inherited upstream source namespaces and attribution remain unchanged.}{}
+\agentProposedEdit
+  {agent-add-4f78534d-32f2-593e-8eb1-5c23b91fb4c6}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Android uses package identifier \code{org.tbend.thoughts}, while inherited upstream source namespaces and attribution remain unchanged.}
+
+\section*{macOS defaults and document opening}
+Right-clicking a visible document tab now shows \textbf{Reveal in Finder} and, below a separator, \textbf{Close Other Tabs}.
+The action reveals the local PDF represented by the tab under the pointer, even when that tab is in the background, without switching the active document.
+It is disabled for non-local document URLs and uses KDE's file-manager highlight API, which delegates to Finder on macOS.
+Close Other Tabs keeps the tab under the pointer, is disabled when it is the only tab, and adds every closed URL to the existing Undo Close Tab history.
+Before removing anything, it asks the normal Save/Discard/Cancel question for every modified tab; Cancel leaves every tab open and restores the previously active tab.
+
+The current profile also contains:
+\begin{DocCode}
+[PageView]
+MouseMode=TextSelect
+\end{DocCode}
+New windows consequently start in Text Selection mode for this user.
+This is a saved-profile preference rather than a source-default change: Okular's factory \code{MouseMode} remains \code{Browse}.
+
+\section*{Direct comment and source synchronisation}
+\agentProposedEdit{agent-remove-a0314749-bcc8-5d74-af4b-6c9f34ecb1bc}{replaced by the Thoughts identity}{After a successful PDF Save or Save As directly into \code{current_pdfs/}, Okular Enter synchronously runs its in-process C++ comment synchroniser.}{}
+\agentProposedEdit{agent-remove-3f3ddcdf-5246-452c-834a-9f6aaaf9b702}{identify the desktop application explicitly}{After a successful PDF Save or Save As directly into \code{current_pdfs/}, Thoughts synchronously runs its in-process C++ comment synchroniser.}{}
+\agentProposedEdit
+  {agent-add-1f8acf6f-469a-53f0-ad74-8d8fb9982144}
+  {Add this agent-authored block for review.}
+  {}
+  {A Library PDF opened from \path{current_pdfs/} is an immutable reading artifact, so Thoughts Desktop never requires or attempts a PDF Save for a comment mutation.
+Adding, editing, moving, deleting, undoing, redoing, changing properties, changing priority or location, and attaching a ChatGPT URL first update the in-memory annotation and then append the same mutation to a private crash-safe journal.
+The interaction succeeds only after the journal entry is flushed to disk, while a worker updates the local materialized JSONL sidecar, queues the durable Fedora operation, and performs source anchoring asynchronously.
+If the journal append fails, Thoughts Desktop reverts the in-memory mutation and reports the error instead of falling back to rewriting the read-only PDF.
+Signatures, form fields, and legacy non-comment changes on ordinary writable PDFs retain the upstream Save and Save As behavior.}
+\agentProposedEdit{agent-remove-9181caaa-8760-4e00-9400-64a43425dac2}{the current mutation path is journal-first and updates a materialized JSONL view instead of an authoritative PDF-save snapshot}{It snapshots the annotations already held in memory, applies that PDF's source delta to the authoritative canonical JSONL, preserves companion-only records, updates local provenance and the public resolution registry with atomic writes, and directly invokes \code{synctex} only when a source lookup is genuinely required.}{}
+
+The source-anchor delta rules are:
+\begin{itemize}
+  \item a newly observed comment gets at most one reverse SyncTeX lookup;
+  \item moving an existing annotation's page or geometry gets at most one new lookup and moves its unique marker when the new location is safe;
+  \item editing only comment text, author, timestamps, colour, opacity, or other non-geometric metadata reuses the existing result and performs no SyncTeX lookup; comment text also repairs the source marker's ignored second argument without rebuilding LaTeX;
+  \item an unchanged \code{needs_anchor} record is preserved without another lookup;
+  \item deleting a comment records a durable tombstone and removes its marker only when that marker is uniquely identifiable;
+  \item removing the unique marker of a previously anchored comment records a global source-resolution tombstone, while a moved marker, an unanchored comment, or an unreadable source is retained safely.
+\end{itemize}
+\agentProposedEdit{agent-remove-222d6f20-9a82-41ca-934d-20f5a440eb04}{Library comment durability is now journal-first and independent of PDF Save}{Consequently, the common second and later saves consist only of small in-memory comparisons and atomic JSON writes.}{}
+\agentProposedEdit{agent-remove-edf37b50-8963-4dad-b9d0-8bcafa4ca7cd}{the durable journal append replaces PDF Save as the local acknowledgement boundary}{Save still waits for this native transaction so that a successful return means comment state is durable.}{}
+\agentProposedEdit{agent-remove-dc22e261-da9e-4c87-a3ee-e102bd5fecc4}{source anchoring failure no longer depends on an already saved immutable Library PDF}{Each genuinely required \code{synctex} process has a one-second timeout; an operational failure leaves the already saved PDF intact and produces a warning.}{}
+\agentProposedEdit
+  {agent-add-475fd643-3df9-5a65-b814-e5a1e62f8954}
+  {Add this agent-authored block for review.}
+  {}
+  {Each genuinely required \code{synctex} process has a one-second timeout, and an anchoring failure leaves the durable comment queued with a visible attention state instead of modifying the PDF.}
+
+\agentProposedEdit
+  {fedora-remove-local-helper-introduction-20260825}
+  {Replace the Mac helper introduction with the Fedora ownership boundary established in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The same synchroniser is also compiled into a headless helper for render-time sidecar preparation:}
+  {}
+\agentProposedEdit
+  {agent-add-05bf3f58-0d79-5de1-92ae-d3eea1da6dc4}
+  {Revise the pending helper note for Fedora-owned preparation in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {Fedora owns render-time sidecar preparation and invokes the native comment component inside the isolated build workspace.}
+\agentProposedEdit
+  {fedora-remove-retired-desktop-helper-block-20260825}
+  {Delete the retired Desktop helper command after the Fedora cutover in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {
+\begin{DocCode}
+/Applications/Okular-Enter.app/Contents/MacOS/okular-enter-comment-sync \
+  prepare-all --docs-root /Users/tbe/Documents/docs
+\end{DocCode}}
+  {}
+\agentProposedEdit
+  {agent-add-e4644b11-ea14-5e80-b3da-84cebc58d4df}
+  {Retire the pending Mac command after Fedora assumed preparation in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {}
+The GUI and helper link the same native library, so JSONL reconciliation, source-resolution handling, anchor safety, insertion, removal, attempt caching, and locking have one implementation.
+One anchor-occurrence index and one exact-build registry are reused across a batch; excluded build, archive, generated, PDF, third-party, and version-control trees are never traversed as authored source.
+When reverse SyncTeX lands inside an exact-build \code{generated/} source, that generated file remains read-only.
+The native engine follows only the build's mapped \code{\textbackslash input} and \code{\textbackslash include} relationships, including omitted \code{.tex} suffixes and nested generated inputs.
+If exactly one safe, marker-eligible authored parent exists, it inserts the marker immediately above that parent's inclusion command and records the authored file with medium confidence.
+A missing, ambiguous, or unsafe parent remains \code{needs_anchor}; the attempt is cached so unchanged saves do not repeat SyncTeX.
+Global \code{prepare-all} also performs the cross-project half of source
+relocation before preparing individual PDFs.
+It follows a unique moved marker directly, or, for an unanchored comment with
+a missing source, requires a unique normalized five-line match from the
+recorded exact-build snapshot.
+The destination sidecar is made durable before the old sidecar receives a
+non-global \code{source_moved} tombstone, so interrupted and repeated runs
+converge without losing or duplicating the comment.
+\agentProposedEdit{agent-remove-d4db215c-832f-4784-bde0-e71ca456da57}{plain F5 is unbound and targeted Fedora builds replace the historical local F5 preparation}{Targeted F5 preparation does not transfer a comment to another project,
+because it cannot publish that other project's canonical PDF.}{}
+For an unchanged historical record, the engine reuses its prior generated-source evidence without another SyncTeX process when the exact build still applies or when that source's old and current build snapshots are byte-identical.
+On the current 35-sidecar, 180-comment workspace, a warm no-op batch completes in 0.60 seconds wall time, of which the native transaction reports 515 milliseconds.
+The helper can be overridden for development with \code{THOUGHTS_COMMENT_SYNC_BIN}.
+Python remains responsible only for render orchestration, exact-build cache construction, PDF layout remapping, annotation publication, and validation.
+The obsolete Python synchronization and pre-render anchoring entry points have been removed.
+\agentProposedEdit
+  {agent-add-25cb6a5e-b008-5145-9b1f-89153f400207}
+  {Add this agent-authored block for review.}
+  {}
+  {The current comment sidecar format is JSONL schema v5.
+Schema v5 supports an ordered \code{fragments} array for a single text-markup comment whose highlight crosses page boundaries and the optional \code{annotation_pdf_sha256} identity used for exact historical-build lookup.
+Highlighted text that uniquely matches inside \code{DocCode} or another unsafe environment uses a medium-confidence standalone source marker immediately after that environment.
+A markup selection that cannot be matched safely remains \code{needs_anchor}, and the synchronizer never promotes an unsafe standalone fallback to anchored high confidence.}
+Blank highlights and other markup annotations remain meaningful even when Okular stores an empty \code{/Contents} value.
+A low-confidence lookup is recorded as \code{needs_anchor} and does not make the save fail.
+
+The first document-level \code{\docTitle} after
+\code{\textbackslash begin\{document\}} is a hard placement floor.
+When reverse SyncTeX targets a line before the title or any line inside its
+complete command, the native engine inserts the marker immediately after the
+closing line; optional arguments, nested braces, comments, and multiline
+titles are handled without placing anything above the title.
+The same rule applies to interactive saves, helper preparation,
+generated-source parent fallback, and cross-project relocation.
+An exact reverse-SyncTeX result on \code{\textbackslash end\{document\}} is
+also a safe command-boundary case: the marker is inserted immediately before
+it.
+Other structural command lines and unsafe environments remain rejected rather
+than triggering a generic nearest-line search.
+
+\agentProposedEdit{agent-remove-0ea52528-1db2-4bde-89d1-d3c46ed6f890}{replace the former desktop application name}{If the PDF save succeeds but native synchronisation cannot complete because of an operational error, the PDF remains saved and Okular displays a warning.}{}
+\agentProposedEdit
+  {agent-add-52228ddd-0ccc-5eb7-820a-496d582d40df}
+  {Add this agent-authored block for review.}
+  {}
+  {If asynchronous sidecar materialization or source anchoring cannot complete, the immutable PDF remains open, the durable journal is retained for retry, and Thoughts Desktop displays the failure.}
+\agentProposedEdit
+  {fedora-remove-comment-sync-runtime-log-20260825}
+  {Delete the removed Mac runtime log location after the cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The latest synchronisation output and phase timings are stored at:
+\begin{DocCode}
+/Users/tbe/Documents/docs/.runtime/target/okular-comment-sync.log
+\end{DocCode}}
+  {}
+\agentProposedEdit
+  {agent-add-41cdcf25-6e21-5527-a429-ebe70846848e}
+  {Retire the pending Mac runtime log path after the cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {}
+A debounced native sidecar watcher observes the open document's canonical sidecar and \path{review_resolutions.jsonl}.
+\agentProposedEdit{agent-remove-b7e9ec12-fbf7-527d-bd47-ca74a30b4de3}{the Fedora server replaces Syncthing delivery}{Changes written by MJ PDF or delivered by Syncthing are reconciled by stable identifier and applied directly to Okular's in-memory annotation model.}{}
+\agentProposedEdit{agent-remove-0d968e1d-98d8-555d-9990-22dcc3342c1b}{replaced by the Thoughts identity}{Changes accepted by the Fedora server are reconciled by stable identifier and applied directly to Okular Enter's in-memory annotation model.}{}
+\agentProposedEdit{agent-remove-7cac545c-db26-4f9a-9c5c-368adc72b9a2}{identify the desktop application explicitly}{Changes accepted by the Fedora server are reconciled by stable identifier and applied directly to Thoughts' in-memory annotation model.}{}
+\agentProposedEdit
+  {agent-add-f4f40ff8-0212-532b-8b78-57a4a1f2d1fe}
+  {Add this agent-authored block for review.}
+  {}
+  {Changes accepted by the Fedora server are reconciled by stable identifier and applied directly to the Thoughts Desktop in-memory annotation model.}
+A separate in-process source watcher observes the marker-eligible \code{.tex} inputs selected by the PDF layout and exact-build mapping, with live sidecar \code{tex_file} values as a fallback.
+It tolerates atomic editor replacements by watching both each file and its parent directory, fingerprints debounced changes, and runs source-only reconciliation on a worker thread.
+Removing a unique \code{\textbackslash ReviewAnchor} therefore creates the same durable tombstone and public resolution while the PDF is open; moving a unique marker updates its source location instead.
+This is done at the same time.
+\agentProposedEdit{agent-remove-d64f21ce-d31a-4703-99ed-3676e6d30439}{replace the former desktop application name}{The .tex is synced with Okular.}{}
+\agentProposedEdit
+  {agent-add-946afe03-4412-5d0c-ba09-003cf1376772}
+  {Add this agent-authored block for review.}
+  {}
+  {The \code{.tex} source is synchronized with Thoughts Desktop.}
+Comments can also moved to other .tex files.
+
+Editing the marker's second argument revises the canonical comment and updates the open annotation in place.  
+A tracked common ancestor distinguishes genuine source edits from mirror writes and prevents watcher feedback loops.
+Ambiguous duplicates, unreadable files, and missing mapping evidence are retained conservatively.
+Both kinds of refresh update the in-memory annotation model without invoking the PDF reload path, adding an undo command, showing a \textbf{Loaded} banner, or running Python or SyncTeX.
+\agentProposedEdit{agent-remove-c59e28fc-02b2-4dd5-b884-516a8561e654}{replace the former desktop application name}{Source edits observed while the PDF is dirty are queued until the successful save completes, and edits made while Okular is closed are reconciled once when the canonical PDF is next opened.}{}
+\agentProposedEdit
+  {agent-add-7b7aaf27-333d-5554-be38-405f1109b6ac}
+  {Add this agent-authored block for review.}
+  {}
+  {Source edits observed while the PDF is dirty are queued until the successful save completes, and edits made while Thoughts Desktop is closed are reconciled once when the canonical PDF is next opened.}
+Sidecar refreshes that arrive while the PDF is dirty or synchronization is running are queued by the same rule rather than discarded.
+\agentProposedEdit
+  {fedora-remove-source-sync-runtime-log-20260825}
+  {Delete the removed source-only Mac runtime log after the cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The latest source-only timings are stored at:
+\begin{DocCode}
+/Users/tbe/Documents/docs/.runtime/target/okular-comment-source-sync.log
+\end{DocCode}}
+  {}
+\agentProposedEdit
+  {agent-add-d8f5356d-3b39-55c4-9837-29e502eaa9a3}
+  {Retire the pending source-only Mac runtime log path after the cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {}
+The \textbf{Annotations} heading reports this PDF-level relationship without adding another sidebar row.
+A normal chain icon means the canonical PDF is linked and its mapped sources are monitored; a warning icon means a canonical PDF has incomplete mapping metadata; and a dimmed chain means the open PDF is not linked, including copies outside \path{current_pdfs}.
+The tooltip gives the mapped source count and project when linked, or explains why anchor changes are not monitored.
+This status is independent of whether every individual comment has a durable anchor.
+
+For a managed PDF, the Annotations sidebar keeps PDF pages in ascending order and orders comments within a page by the exact build's TeX-input order followed by the current source-marker or candidate line.
+Source-located comments precede geometry-only comments, which retain the visual top-to-bottom, left-to-right fallback.
+A palette-aware neutral amber background identifies comments without a durable source marker.
+\agentProposedEdit{agent-remove-589c9c50-8f69-488c-b40d-8f30b301f92f}{plain F5 is no longer a refresh trigger and Library comment mutations no longer require PDF Save}{The ordering metadata is refreshed on open, successful save, F5, and ordinary reload; it uses no watcher and performs no SyncTeX query.}{}
+\agentProposedEdit
+  {agent-add-d10bb72c-4e66-5fb5-980b-9b15acfbe45f}
+  {Add this agent-authored block for review.}
+  {}
+  {The ordering metadata is refreshed on open, durable comment mutation, sidecar refresh, Fedora Library activation, and ordinary reload without performing a new SyncTeX query.}
+
+\agentProposedEdit{agent-remove-38a9fd08-75a2-49b0-a6fa-765758f47629}{replace the retired F5 renderer workflow with the current Sync and Reload controls}{\section*{F5 targeted PDF refresh}}{}
+\agentProposedEdit
+  {agent-add-7800c156-75d1-5a5c-bd72-1bcc3053c030}
+  {Update the pending synchronization block for exact project isolation, schema-version-three closure verification, and common Desktop and Android behavior from Codex conversation hash 01a03d38-a300-7be1-ac03-4b540a4f117d.}
+  {}
+  {\section*{Sync, status, and PDF rebuild controls}
+\textbf{Sync} publishes authored changes and exact build objects for the current PDF without compiling, while \textbf{Sync All} applies the same reconciliation independently to every registered Library project.
+\textbf{Build} performs the current PDF's exact synchronization and then compiles that captured source frontier and snapshot, while \textbf{Build All} applies the same process independently to every registered Library project.
+No targeted action may enumerate, publish, upload, or compile an unrelated project.
+The Library source index is the only authority for mapping a PDF to its project, and a missing or ambiguous mapping is a scoped error rather than permission to derive a project name or publish global paths.
+The toolbar's main control is always labelled \textbf{Sync}, and selecting it publishes queued managed sources and lightweight operations, receives authoritative Fedora state, and activates ready verified PDFs without starting a build.
+The arrow beside \textbf{Sync} opens the active PDF's status, reason, last verified synchronization time, latest build output, and at most one exact status-specific action.
+The standardized mappings are \textbf{Sync needed} to \textbf{Sync} and \textbf{Build required} to \textbf{Build \& Sync}.
+The Desktop Overview summarizes the decisive state as an exact counted sentence such as \textbf{16 PDFs need a build} or \textbf{19 PDFs are up to date} and derives its single \textbf{Sync} or \textbf{Build \& Sync} action from those rows.
+Opening the Desktop Overview reads only the last locally persisted Fedora snapshot, performs no Fedora or Library-head request, and makes the cached action immediately available.
+The Overview shows Fedora's server-issued observation time together with the latest successful Fedora PDF build time, while a failed fetch preserves the previous snapshot and both timestamps and reports \textbf{Status not refreshed}.
+A successful Fedora PDF build is shown as seconds, minutes, or hours ago for its first 24 hours and as a localized exact date and time thereafter.
+An ordinary Overview \textbf{Sync} starts immediately, while selecting \textbf{Build \& Sync} first refreshes the global snapshot, displays \textbf{Checking build inputs\ldots}, and performs the authoritative affected-PDF preflight without blocking the interface.
+The native C++ verifier checks the schema-version-three snapshot directly by watching only the selected project's authored paths and declared objects and recomputing their SHA-256, size, media identity, and role.
+Any missing input, changed byte, graph error, snapshot error, or timeout clears all build authorization, performs only an ordinary \textbf{Sync}, and requires a later explicit \textbf{Build \& Sync} click.
+During source publication, the enabled Overview control is labelled \textbf{Show Sync Log} and opens or focuses the read-only timestamped operational journal rather than a Terminal window.
+A \textbf{Synced} status uses a green checked icon, shows \textbf{Last verified synced} in the menu, and provides no action.
+The toolbar and status menu never add an \textbf{Open PDF} action because the PDF is already opened by selecting its Library row or thumbnail.
+Only an explicit \textbf{Sync}, \textbf{Build \& Sync}, pull-to-refresh, or recovery of that already-running operation may fetch status through \path{/v1/render-state?target=all}.
+Thoughts Android shows the same counted cached summary, successful-build time, and Fedora observation time in a full-width row directly above \textbf{Linked documents}.
+Tapping that row opens the cached global dialog without fetching Fedora state, and the dialog offers exactly one status-specific primary action so \textbf{Build required} never appears beside a redundant \textbf{Sync} button.
+The Thoughts Android reader toolbar contains no per-PDF synchronization control, while the first \textbf{Sync \& Build} tile in the three-dot menu and the matching row in a managed Library PDF's options open the same cached per-PDF status panel with the last successful synchronization, the last successful Fedora build, and always-visible \textbf{Sync} and \textbf{Build} buttons that stay open, immediately show \textbf{Syncing} or \textbf{Building}, present both timestamps as \textbf{a moment ago} for the first minute, whole minutes or hours below 24 hours, and an exact localized date and time thereafter, and are disabled when unavailable; the outer Library options dialog closes when the panel opens, while tapping outside the panel or using Android Back dismisses it.
+The on-demand exact check hashes only the selected project's authored source frontier and declared \path{tex/assets/}, \path{tex/generated/}, and explicit external-PDF objects against the published schema-version-three snapshot.
+A document Sync succeeds only when its captured outbox is acknowledged, its captured source frontier and snapshot are current, and the active local PDF matches the server publication identity.
+A document Build additionally succeeds only when the publication records the completed build identity and captured source frontier.
+Android never scans or uploads Mac repository folders and binds Build to the latest server-published schema-version-three snapshot for the selected publication.
+Desktop and Android persist one trace identity and one reconciled operation timeline with the same phases, target, elapsed time, transferred bytes, transition time, stable error code, and failure reason.
+Application startup may reconcile local durable facts and an exact surviving Android scheduler job, but it never creates, re-enqueues, or resumes replacement network work.
+A changed local source or build input first produces \textbf{Sync needed}, after which Fedora can report \textbf{Build required} against the synchronized input frontier.
+Internal \path{.thoughts-library-stage-<revision>} paths are normalized to the canonical \path{current_pdfs/<filename>} identity before status evaluation.
+Every downloaded Library generation is finalized with read-only files and directories before its complete manifest is atomically activated through \path{current_pdfs}.
+After activation and at startup, generation collection retains the active target, any in-progress download, and every generation open in Thoughts or another macOS process.
+Generation collection aborts without pruning when the active generation manifest, Library revision, or any PDF hash fails validation.
+Plain F5 has no shortcut binding.
+\textbf{Reload} remains bound to \code{Alt+F5} and performs only an ordinary disk reload for every PDF.
+During checking, syncing, publishing, building, downloading, or activation, the interface shows progress and does not offer a duplicate build action.
+A successful Fedora build is activated only as part of a complete hash-verified read-only Library generation, while a failed build leaves the last-good PDF open and exposes its error details or \textbf{Build \& Sync}.
+The Overview context menu and Android three-dot menu can set a synchronized display name for any linked or unlinked Library PDF without changing its canonical identity or source and comment relationships.
+The same menus can archive or unarchive any Library PDF through synchronized metadata, with Archived shown below Unlinked while retaining opening, comments, statuses, builds, synchronization, and All Comments visibility.
+Synchronized archive metadata does not reuse Android's independent device-local Hide flag.}
+
+\ReviewAnchor{mjpdf-8310e0d2-2d0e-4d5c-a5ba-df8c56a00752}{Why targeted with F5? This is wrong..m I would just remove it}%
+\agentProposedEdit{agent-remove-c04aa267-86a6-46e7-93b8-20b0387c7b3b}{plain F5 is unbound and Fedora build actions replace the local renderer command}{For a source-linked canonical PDF in \path{current_pdfs}, F5 now runs:}{}
+\agentProposedEdit
+  {fedora-remove-f5-render-command-20260825}
+  {Delete the retired F5 shell command after Desktop stopped spawning local builds in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {
+\begin{DocCode}
+/bin/bash /Users/tbe/Documents/docs/tools/render_all.sh \
+  --fix \
+  --pdf /Users/tbe/Documents/docs/current_pdfs/<name>.pdf
+\end{DocCode}}
+  {}
+\ReviewAnchor{mjpdf-97bafe0f-1075-4514-bee8-97c2a82b593b}{Can we remove this?}%
+\agentProposedEdit{agent-remove-bc177f56-e810-49b4-9474-1bed0f901e31}{the current build eligibility check uses the authoritative source and Library indexes plus exact input metadata}{The source-link layout and owning \code{docs-*} project must both exist, and the project must not be listed in \path{tools/render_skip_projects.txt}.}{}
+\agentProposedEdit{agent-remove-f74b7650-5994-4cd2-940c-48a23dd6bd56}{replace the former desktop application name}{Unwired PDFs, copied or trajectory PDFs, individual build artifacts, skipped projects, PDFs outside \path{current_pdfs}, non-PDF documents, and remote URLs use Okular's ordinary lightweight reload and never trigger an unrelated documentation build.}{}
+\agentProposedEdit
+  {agent-add-fd2edcff-f5a5-548e-be6a-42e85a5d840c}
+  {Add this agent-authored block for review.}
+  {}
+  {Unwired PDFs, copied or trajectory PDFs, individual build artifacts, skipped projects, PDFs outside \path{current_pdfs}, non-PDF documents, and remote URLs use Thoughts Desktop's ordinary lightweight reload and never trigger an unrelated documentation build.}
+
+\agentProposedEdit{agent-remove-dd1232b4-03af-4037-a618-8b1e13bcfb9b}{the current Desktop action publishes to the authoritative Fedora server and normal builds never run automatic Codex repair}{The renderer runs asynchronously with the docs root as its working directory.
+Targeted mode checks only the owning project's inputs, compiles only changed TeX sources, discovers the precise cross-project PDFs linked by the refreshed target, updates only their producing sources when necessary, and republishes only the open combined PDF with its comments retained.
+An unchanged warm target skips LaTeX, recombination, Ghostscript validation, and publication.
+F5 passes \code{--fix}, but not \code{--force} or \code{--commit}.
+The fix wrapper first runs the same targeted command without Codex, so a successful refresh has no model invocation.
+Only after that command fails does it launch \code{codex exec} with \code{gpt-5.6-luna} at medium reasoning, allow the agent to make the minimum relevant source repair, and rerun the same targeted command until it succeeds.
+These automatic source edits remain uncommitted and unpushed.
+F5 does not run a separate current-PDF comment synchronisation.}{}
+\agentProposedEdit{agent-remove-5232f11f-0e66-4c60-96d0-b40a80bf1e50}{replace the former desktop application name}{Phone sidecar changes continue to refresh automatically, while a dirty Okular document uses the ordinary Save path and therefore synchronises exactly once if the user chooses \textbf{Save}.}{}
+\agentProposedEdit
+  {agent-add-39adb5d8-bbb5-511f-8c03-de288d56a91c}
+  {Add this agent-authored block for review.}
+  {}
+  {Thoughts Android operations appear after manual synchronization, while Desktop Library comments remain durable through the sidecar-first journal without a PDF Save.}
+\agentProposedEdit{agent-remove-a3a631fc-23f6-46ec-bdd8-79284dbddbc5}{the authoritative Fedora worker now prepares the exact target frontier and normal Desktop actions do not run the local targeted renderer}{The targeted renderer invokes the native helper with \code{prepare-all --stem <name>} so only the open PDF's sidecar and anchors are prepared.
+Running \path{tools/render_all.sh} without \code{--pdf} remains the explicit repository-wide regeneration command and retains its global \code{prepare-all} integrity stage.}{}
+
+A Finder-launched application does not reliably inherit the terminal's PATH.
+\agentProposedEdit{agent-remove-1893510f-e3af-53f1-8320-7d8f731c2a67}{replaced by the Thoughts identity}{Okular Enter therefore supplies explicit MacTeX, Homebrew, local-tool, Python, and system binary directories to the renderer process so that \code{latexmk}, \code{qpdf}, \code{gs}, and \code{python3} remain discoverable.}{}
+\agentProposedEdit
+  {agent-add-1a8adb64-46e5-532d-ba15-fb522b300247}
+  {Add this agent-authored block for review.}
+  {}
+  {The historical local renderer required an explicit tool path, while normal PDF builds now execute inside the Fedora worker's recorded toolchain.}
+\agentProposedEdit{agent-remove-e5bb605b-8bc7-4455-95a8-21bc3c7f8da6}{replace the former desktop application name}{While the process is running, Okular explains that Codex will repair render errors automatically, disables the reload action, ignores repeated F5 requests from the same viewer, and temporarily suspends its PDF file watcher to avoid reloading a partially written output.}{}
+\agentProposedEdit
+  {agent-add-8a62f468-a0b1-5c4f-ba96-67d9d30a0076}
+  {Add this agent-authored block for review.}
+  {}
+  {While a Fedora build is running, Thoughts Desktop presents live build output and suppresses duplicate build requests without granting automatic source-repair authority.}
+\agentProposedEdit
+  {fedora-remove-f5-runtime-log-20260825}
+  {Delete the retired F5 renderer log after the cleanup in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {The complete output from the latest run is stored at:
+\begin{DocCode}
+/Users/tbe/Documents/docs/.runtime/target/okular-f5-render.log
+\end{DocCode}}
+  {}
+\agentProposedEdit
+  {agent-add-f4128294-32b9-5c10-b260-36d4917266d9}
+  {Revise the pending log note for Fedora build identifiers in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {}
+  {Current build details and logs are identified by the Fedora build ID.}
+\agentProposedEdit
+  {fedora-remove-local-render-timing-line-20260825}
+  {Delete the retired local renderer timing description after the Fedora cutover in Codex conversation hash 75feaf412362c5abd783e0debdfda0cbe6d62077eaa9c6151cd437a1d834ef61.}
+  {Its final timing line separates target preparation, target compilation, linked dependencies, final link resolution, publication, and total runtime.}
+  {}
+
+\agentProposedEdit{agent-remove-01ad5722-c9d9-4d7e-bcae-b2b486b1ad87}{immutable Library comments no longer participate in an F5 Save prompt and plain F5 is unbound}{If the current PDF has unsaved annotations or form changes, F5 first offers \textbf{Save}, \textbf{Discard}, and \textbf{Cancel}.
+\textbf{Save} writes the changes before rendering so the docs pipeline can retain them.
+\textbf{Discard} performs an ordinary safe reload before starting the renderer, while \textbf{Cancel} leaves both the document and renderer untouched.}{}
+\agentProposedEdit{agent-remove-502a84ab-a023-4fe7-a169-2e661577ac8c}{replace the former desktop application name}{For a modified format that Okular cannot save, the dialog offers only discard-and-render or cancel.}{}
+\agentProposedEdit
+  {agent-add-03e5f7d7-4201-53b1-9332-30b1a4bee5a5}
+  {Add this agent-authored block for review.}
+  {}
+  {Ordinary writable non-Library documents retain their format-specific Save, Discard, and Cancel behavior.}
+
+\agentProposedEdit{agent-remove-e03b552a-d56e-4db6-8ce4-c223bde77025}{replace the former desktop application name}{After a successful render, Okular reloads the same PDF and preserves its normal viewport, rotation, presentation state, and sidebar state.}{}
+\agentProposedEdit
+  {agent-add-afe6d4db-ca99-5eb4-b069-02457e491ac4}
+  {Add this agent-authored block for review.}
+  {}
+  {After a successful Library activation, Thoughts Desktop keeps the same canonical document identity and preserves its normal viewport, rotation, presentation state, sidebar state, and open tabs.}
+\agentProposedEdit{agent-remove-3904f626-6858-4a04-8a6a-4ce136b98cfe}{normal Fedora builds do not run automatic repair and retain the last-good PDF on failure}{If rendering and automatic repair both fail, the PDF remains open and is not reloaded; its file watcher is restored and the interface shows the final actionable recovery error, exit reason, and log path.}{}
+\agentProposedEdit{agent-remove-95de271f-bceb-4448-acfe-a1d30fd14dfb}{Library activation now checks the canonical document identity before replacing any open tab}{If the tab was replaced while rendering, the new document is left alone.}{}
+
+\section*{VS Code PDF links}
+\agentProposedEdit
+  {agent-add-08f8a699-0ea7-5c2e-a460-661e37b80c29}
+  {Add this agent-authored block for review.}
+  {}
+  {The extension details below are historical and are superseded by \code{local.thoughts-pdf-links} version \code{1.1.1}.
+The current source is \path{/Users/tbe/repos/vscode-thoughts-pdf-links}, and the current package is \path{/Users/tbe/repos/vscode-thoughts-pdf-links/dist/thoughts-pdf-links-1.1.1.vsix}.
+The extension uses bundle identifier \code{org.tbend.thoughts}, view type \code{thoughts.externalPdf}, command \code{thoughts.openLinkedPdf}, and context key \code{thoughts.linkedTexPaths}.
+Any Okular Enter name or \code{okular-enter} identifier in the historical block below refers to the retired desktop branding and is not a third current application.
+The current PDF editor association selects \code{thoughts.externalPdf}, and the extension launches local files with \code{/usr/bin/open -b org.tbend.thoughts <PDF path>} without invoking a shell.
+The current installation command is \code{code --install-extension /Users/tbe/repos/vscode-thoughts-pdf-links/dist/thoughts-pdf-links-1.1.1.vsix --force}.
+The current validation command is \code{cd /Users/tbe/repos/vscode-thoughts-pdf-links \&\& npm test}.}
+
+The two former in-editor PDF viewers, \code{mathematic.vscode-pdf} and \code{tomoki1207.pdf}, have been uninstalled.
+They are replaced by the local extension \code{local.okular-enter-pdf-links}, version \code{1.1.0}, whose source and packaged installer are:
+\begin{itemize}
+  \item source: \path{/Users/tbe/repos/vscode-okular-enter-pdf-links};
+  \item VSIX: \path{/Users/tbe/repos/vscode-okular-enter-pdf-links/dist/okular-enter-pdf-links-1.1.0.vsix}.
+\end{itemize}
+Its SHA-256 is:
+\begin{DocCode}
+3a613825ef52b1682e66254b9c05a541f5bd9b3d1c148f93b4f3f58d75d032e1
+\end{DocCode}
+
+The VS Code user setting that selects the handler is:
+\begin{DocCode}
+"workbench.editorAssociations": {
+  "*.pdf": "okularEnter.externalPdf"
+}
+\end{DocCode}
+When VS Code resolves a local PDF through its editor-opening path, the extension invokes:
+\begin{DocCode}
+/usr/bin/open -b org.kde.okular.enter <PDF path>
+\end{DocCode}
+The argument is passed directly to \code{open}, without a shell, so paths containing spaces are preserved.
+\agentProposedEdit{agent-remove-85129bb4-7fa8-4000-bcf8-4d371aa95e36}{replace the retired desktop application label}{The temporary VS Code editor panel is then closed, leaving the document in \code{Okular Enter}; the application's tab preference determines whether it joins an existing window.}{}
+\agentProposedEdit
+  {agent-add-d0099ec8-adce-5198-9ca0-2dd15222fe21}
+  {Add this agent-authored block for review.}
+  {}
+  {With the current extension, the temporary VS Code editor panel is closed after the document opens in Thoughts Desktop, and the application's tab preference determines whether it joins an existing window.}
+The handler deliberately accepts only local \code{file:} resources.
+A PDF that exists only on a remote host must first be copied or downloaded to this Mac.
+
+\agentProposedEdit{agent-remove-2b0474d9-3717-4d7a-b4c9-70534cefa981}{replace the retired desktop application label}{The same extension adds \textbf{Open PDF in Okular Enter} to the context menu of a linked \code{.tex} editor tab.}{}
+\agentProposedEdit
+  {agent-add-c3a3be71-5dd1-5307-a4ae-46148a283816}
+  {Add this agent-authored block for review.}
+  {}
+  {The current extension adds \textbf{Open PDF in Thoughts Desktop} to the context menu of a linked \code{.tex} editor tab.}
+It reads the authoritative version-one mappings under \path{comments/.layout/}, resolves the selected source to its canonical annotated PDF under \path{current_pdfs/}, and uses the same shell-free launcher.
+\agentProposedEdit{agent-remove-79065364-a757-4e19-90be-4925821cec9b}{replace the retired desktop application label}{The command opens the PDF normally, preserving Okular Enter's remembered page and tab behavior.}{}
+\agentProposedEdit
+  {agent-add-1c976eb0-e79a-5ea3-87cc-5cc9a2686bad}
+  {Add this agent-authored block for review.}
+  {}
+  {The command opens the PDF normally, preserving Thoughts Desktop's remembered page and tab behavior.}
+It is absent when the selected source is not listed in a current layout or when either the source or canonical PDF is missing.
+Layout and canonical-PDF creation, update, and deletion events refresh the menu automatically.
+If an unusual source is linked to more than one canonical PDF, the extension asks which one to open.
+
+After installing or updating the extension, run \textbf{Developer: Reload Window} from the VS Code Command Palette when it is safe to restart that window's extension host.
+The current installation command is:
+\begin{DocCode}
+cd /Users/tbe/repos/vscode-okular-enter-pdf-links/dist
+code --install-extension \
+  okular-enter-pdf-links-1.1.0.vsix --force
+\end{DocCode}
+Validate the launcher without opening a document by running:
+\begin{DocCode}
+cd /Users/tbe/repos/vscode-okular-enter-pdf-links
+npm test
+\end{DocCode}
+To roll back, uninstall \code{local.okular-enter-pdf-links} and remove the \code{"*.pdf"} editor association above.
+
+\section*{Annotations-only sidebar}
+
+The custom sidebar exposes exactly one view: \textbf{Annotations}.
+Its one-tab selector row is hidden, so showing the sidebar displays the annotation panel directly.
+Thumbnails, Bookmarks, Contents, Layers, and Signatures are not registered as sidebar entries, and document metadata cannot switch the panel away from Annotations.
+This remains true for PDFs that contain an embedded outline, optional layers, or digital signatures.
+
+The supporting thumbnail, bookmark, outline, layer, and signature objects remain alive in a hidden internal owner where Okular's document and action logic still expects them.
+Bookmark menu commands and ordinary PDF navigation therefore continue to work; only the corresponding sidebar interfaces are removed.
+When a document contains no annotations, the annotation tree is blank instead of painting the \textbf{No annotations} and \textbf{To create new annotations press F6} instruction card.
+The Annotations title, search field, and review-options toolbar remain available.
+
+\section*{Annotation reading order}
+
+A PDF page's annotation array normally reflects the order in which annotations were created or stored, not their visual order on the page.
+The original Okular annotation model retained that array order unchanged.
+In \path{/Users/tbe/Desktop/multiplechoice_reasoning.pdf}, for example, page 1 stored notes at visibly lower positions before notes near the top, and page 4 stored its lower highlight before its upper highlight.
+The resulting sidebar sequence therefore disagreed with the document's reading order even though the annotations themselves were positioned correctly.
+
+\agentProposedEdit{agent-remove-bb806db5-1779-5cc6-861a-aeabd01a9c22}{incomplete after source-aware ordering was implemented}{\code{Okular Enter} now applies one permanent visual order in the sidebar:}{}
+\begin{enumerate}
+  \item ascending PDF page;
+  \item \agentProposedEdit{agent-remove-069a851e-c61b-5a30-a75a-0195979cf37f}{only a fallback after source order}{top to bottom within each page;}{}
+  \item \agentProposedEdit{agent-remove-81433c66-f041-5ae3-ab53-fa214d47a1d3}{only a fallback after source order}{left to right when annotations have the same top position;}{}
+  \item \agentProposedEdit{agent-remove-b86c9115-5911-5dde-892b-a18d19f803d3}{only a fallback after source order}{bottom and right edges as further geometric tie-breakers;}{}
+  \item \agentProposedEdit{agent-remove-4ebb8b04-c0d2-5f4c-981b-583100a41adf}{only a fallback after source order}{original embedded order when two annotations have exactly the same rectangle.}{}
+\end{enumerate}
+The sort lives in the dynamic page-filter proxy below the page- and author-grouping layers.
+Flat, page-grouped, author-grouped, current-page-only, and searched views consequently share the same sequence, as does \(\uparrow\)/\(\downarrow\) keyboard review.
+Adding, moving, resizing, deleting, restoring, or reloading annotations updates the order automatically.
+Only the sidebar presentation changes; the PDF and its underlying annotation array are not rewritten.
+
+The focused regression test \code{testAnnotationSidebarReadingOrder} covers scrambled insertion order, multiple pages, left-to-right ties, exact-position ties, movement, deletion, undo, grouping, current-page filtering, and keyboard review.
+It runs with the adjacent navigation and cursor tests using:
+\begin{DocCode}
+parttest testAnnotationSidebarReadingOrder \
+  testAnnotationSidebarSelectionHighlight \
+  testAnnotationSidebarKeyboardNavigation \
+  testAnnotationReviewCursorChurn
+\end{DocCode}
+
+\section*{Final review workflow}
+
+Show the sidebar with \code{F7} if it is hidden, then select an actual annotation row.
+The sidebar opens directly on Annotations because no other sidebar view is exposed.
+The final interaction is intentionally explicit: moving the selection never opens the next note or moves the PDF viewport automatically.
+
+\paragraph{Single-click an annotation in the sidebar}
+Select the annotation without moving the PDF viewport or opening its note.
+\agentProposedEdit{agent-remove-21769382-59c3-47ec-b18e-69c6a7023850}{replace the former desktop application name}{When the corresponding PDF page is visible, Okular draws a temporary accent-coloured overlay around the annotation.}{}
+\agentProposedEdit
+  {agent-add-0ce91a56-8eed-57f9-b07e-d1f2228a556c}
+  {Add this agent-authored block for review.}
+  {}
+  {When the corresponding PDF page is visible, Thoughts Desktop draws a temporary accent-coloured overlay around the annotation.}
+Text markups follow each exact highlight, underline, strikeout, or squiggly line quadrilateral rather than one large bounding box; pop-up notes and other annotations use their icon or annotation bounds.
+The overlay follows arrow-key and post-deletion selection, remains until another annotation is selected or the selection is cleared, and appears when an off-page selection later becomes visible.
+It is a viewer-only indication: it does not modify, dirty, print, or export into the PDF.
+
+\paragraph{Single-click an annotation in the PDF}
+Select and reveal the exact corresponding annotation row in the sidebar without moving the PDF viewport.
+Collapsed page and author groups are expanded as needed, and the row is scrolled into view.
+If an active annotation search hides the row, that search is cleared so the clicked annotation can be shown.
+This reciprocal selection works in Browse and Text Selection modes; Text Selection mode also retains its existing behavior of opening the annotation note.
+
+\paragraph{\code{Enter}, \code{Return}, or keypad \code{Enter}}
+Center the PDF on the selected annotation and open its note window.
+Keyboard focus remains on the annotation list, not inside the note text editor, so the arrow keys remain available for review navigation.
+
+\paragraph{Double-click an annotation in the sidebar}
+Perform the same operation as \code{Enter}: select it, center its PDF location, open the note, and leave focus on the sidebar.
+
+\paragraph{\(\uparrow\) and \(\downarrow\)}
+After review mode has been entered by opening a note, close the currently tracked review note, skip page and author grouping rows, select the adjacent annotation, and scroll it into view in the sidebar.
+The PDF remains at the last explicitly opened location.
+The newly selected annotation stays closed until \code{Enter} or a sidebar double-click is used.
+
+\paragraph{\code{Backspace} or \code{Delete}}
+Delete only the current annotation, without a confirmation dialog.
+The current review note closes and the next annotation is selected, or the previous annotation is used when deleting the last row.
+The PDF viewport remains unchanged.
+The replacement selection is not opened automatically.
+\agentProposedEdit{agent-remove-404f662b-b95c-499f-9c8d-f62f61d24fbb}{replace the former desktop application name}{The deletion uses Okular's normal document undo stack, so \code{Command-Z} can restore it.}{}
+\agentProposedEdit
+  {agent-add-568969d6-db2b-532d-91ff-6092264f0704}
+  {Add this agent-authored block for review.}
+  {}
+  {The deletion uses Thoughts Desktop's normal document undo stack, so \code{Command-Z} can restore it.}
+\agentProposedEdit{agent-remove-18f620a8-eb8e-4d92-83b6-c8d9428c9250}{replace the former desktop application name}{A grouping row or an annotation that Okular does not allow to be removed is not deleted.}{}
+\agentProposedEdit
+  {agent-add-e6a50f7e-d0ab-53f8-a017-52d7932a46cb}
+  {Add this agent-authored block for review.}
+  {}
+  {A grouping row or an annotation that Thoughts Desktop does not allow to be removed is not deleted.}
+
+\agentProposedEdit{agent-remove-ae585b0b-9200-41e3-b57e-bed5ba935a39}{replace the former desktop application name}{\paragraph{Cross-page text markup comments}
+Annotating one text selection that crosses page boundaries creates one logical sidebar comment and one undo step.
+Okular keeps a page-scoped highlight fragment on every selected page, assigns the first fragment the logical identifier, and assigns deterministic continuation identifiers to the remaining fragments.
+Only the root appears in the Annotations sidebar.
+Clicking any continuation selects and opens that root, the temporary selection outline covers every visible fragment, and Backspace or Delete removes all fragments atomically; Command-Z restores the complete group.
+On Save, the canonical sidecar stores the group as one schema-v3 record, while PDF publication expands it back to standards-compatible page annotations.
+Older independently named duplicates are normalized during a managed-document save only when a unique page-boundary match is safe; otherwise they stay separate.}{}
+\agentProposedEdit
+  {agent-add-580158a4-1795-5b34-873c-a86200974cb5}
+  {Add this agent-authored block for review.}
+  {}
+  {\paragraph{Cross-page text markup comments}
+Annotating one text selection that crosses page boundaries creates one logical sidebar comment and one undo step.
+Thoughts Desktop keeps a page-scoped highlight fragment on every selected page, assigns the first fragment the logical identifier, and assigns deterministic continuation identifiers to the remaining fragments.
+Only the root appears in the Annotations sidebar.
+Clicking any continuation selects and opens that root, the temporary selection outline covers every visible fragment, and Backspace or Delete removes all fragments atomically, while Command-Z restores the complete group.
+The local materialized sidecar stores the group as one schema-v5 record, while PDF publication expands it back to standards-compatible page annotations.
+Older independently named duplicates are normalized during durable comment materialization only when a unique page-boundary match is safe, while other duplicates stay separate.}
+
+\paragraph{Single left-click on the PDF page}
+Close the note that was opened through the sidebar review workflow when the click is on a non-annotation part of an actual PDF page.
+A drag, a click in the gray margin, or a click on an annotation marker does not trigger this dismissal.
+
+\paragraph{Double-click an annotation marker in the PDF}
+\agentProposedEdit{agent-remove-f6c60030-2257-467d-95f4-a3ae12a80342}{replace the former desktop application name}{Keep Okular's marker behavior and open that annotation.}{}
+\agentProposedEdit
+  {agent-add-79eb97b4-bc51-5e74-96a4-aa2d78105f2d}
+  {Add this agent-authored block for review.}
+  {}
+  {Keep Thoughts Desktop's marker behavior and open that annotation.}
+Independently opened annotation windows are not treated as the tracked sidebar review window and are not closed by a blank-page click.
+
+Because focus stays in the sidebar, opening a note is primarily a reading action.
+To edit its text, click inside the note editor explicitly; while the editor owns focus, its normal text-editing key behavior applies.
+
+\section*{Text-selection annotation workflow}
+
+\agentProposedEdit
+  {agent-add-3fd216d1-713a-5cce-a513-f954119278ee}
+  {Add this agent-authored block for review.}
+  {}
+  {Right-clicking selected text displays \textbf{Copy Text}, \textbf{Highlight Text}, \textbf{Anchor Text\ldots}, and \textbf{Add Pop-up Note} in that order.}
+\agentProposedEdit{agent-remove-4cecb08e-267f-5b52-a23f-f88157359f0d}{project-local PDFs are no longer eligible for PdfLink anchors}{\textbf{Anchor Text\ldots} remains visible but is enabled only for a PDF stored directly in the workspace-global \path{/Users/tbe/Documents/docs/third_party/} folder or a project's \path{docs-project/third_party/} folder.}{}
+\agentProposedEdit
+  {agent-add-af482ca3-c0e7-5f1f-a610-45c6d4814acc}
+  {Add this agent-authored block for review.}
+  {}
+  {\textbf{Anchor Text\ldots} remains visible but is enabled only for a PDF stored directly in the workspace-global \path{/Users/tbe/Documents/docs/third_party/} folder.
+The anchor action accepts a single-page selection, prompts for a filename-safe unique name, and creates a normal yellow highlight whose complete comment is \code{doc-anchor:name}.
+The action copies a complete \code{\PdfLink} command containing the PDF filename, anchor name, and LaTeX-escaped selected text.}
+\agentProposedEdit{agent-remove-bb6e24fe-448a-418b-8293-465cdf693733}{replace the former desktop application name}{The new anchor uses Okular's normal undo and save workflow, so the PDF must be saved before the documentation renderer can use it.}{}
+\agentProposedEdit
+  {agent-add-18022b51-c8e8-54bb-bb54-36a309a3bf84}
+  {Add this agent-authored block for review.}
+  {}
+  {The new anchor uses Thoughts Desktop's normal undo and save workflow, so the PDF must be saved before the documentation renderer can use it.}
+
+\agentProposedEdit{agent-remove-b17e74f3-bfc2-59be-a6c1-2f31f0b444b2}{inconsistent with the unified text-selection menu}{\textbf{Annotate Text} uses the configured built-in highlighter color and opacity, with yellow as the fallback.}{}
+\agentProposedEdit
+  {agent-add-7ccc8738-dbde-5e6c-a693-e9666d3ea95d}
+  {Add this agent-authored block for review.}
+  {}
+  {\textbf{Highlight Text} uses the configured built-in highlighter color and opacity, with yellow as the fallback.}
+The highlight geometry preserves the selected text regions, but its comment contents start empty; the selected passage is not copied into the note editor.
+For a selection spanning multiple pages, one highlight is created per selected page and the first note window is opened.
+The temporary text selection is cleared after the annotations are added.
+
+When no text is selected, right-clicking ordinary PDF page space displays exactly \textbf{Add Pop-up Note} and \textbf{Open in vscode}.
+\agentProposedEdit
+  {agent-add-e4125b3f-06a2-59c9-975e-862482c9e5ef}
+  {Add this agent-authored block for review.}
+  {}
+  {\textbf{Add Pop-up Note} creates its blank linked annotation at the right-click position while retaining the current text selection.
+When no text is selected, right-clicking ordinary PDF page space displays exactly \textbf{Add Pop-up Note}.
+It creates a blank linked text annotation at the click position, keeps the icon within the page boundary, applies the configured pop-up-note icon, color, and opacity, and opens the editor immediately.
+The action is disabled when the document forbids notes.
+Links and existing annotation markers retain their normal context menus, and the one-action fallback applies only to otherwise blank page space.}
+\agentProposedEdit{agent-remove-27409a1c-9f9c-4c2e-bc96-58bd7da234ee}{replace the former desktop application name}{Both highlight and pop-up-note creation use Okular's normal document API and therefore participate in undo.}{}
+\agentProposedEdit
+  {agent-add-8c05282f-bf14-55fa-b7f5-ee5afd159d41}
+  {Add this agent-authored block for review.}
+  {}
+  {Both highlight and pop-up-note creation use Thoughts Desktop's normal document API and therefore participate in undo.}
+
+The sidebar's custom \code{TreeView} intercepts unmodified Enter, Return, Up, Down, Backspace, and Delete keys.
+It maps indexes through the author, page-group, and filter proxy models before acting on the underlying annotation.
+Adjacent selection walks over visible rows until it finds a real annotation, which avoids stopping on group headings.
+A persistent source-model index is captured before deletion so that the surviving adjacent annotation can be mapped back into the rebuilt proxy-model view afterward.
+Only \code{openReview} calls the viewport-centering action; arrow movement and post-deletion selection do not.
+The tree's current-index signal independently updates \code{PageView}'s selected-review annotation, so ordinary clicks and keyboard movement share the same overlay behavior.
+
+\code{PageView::openReviewAnnotationWindow} closes the previously tracked review note when a different review note is explicitly opened.
+\code{PageView::openAnnotationWindow} records the widget that owned focus before showing and raising the note window, then restores that focus.
+This prevents the note's text editor from silently taking the arrow keys.
+\code{PageView::reviewSelectionPath} uses transformed highlight quad points for exact rotated text-line geometry and falls back to the transformed annotation bounds for other types.
+The stored annotation unique name remaps the non-owning pointer after an in-place PDF reload; deletion and document changes clear stale state before repainting.
+
+The selected-text branch constructs a dedicated menu before the ordinary link and annotation menu path.
+Its annotation action creates \code{HighlightAnnotation} objects directly from each page's normalized selection rectangles and deliberately initializes \code{contents} to an empty string.
+The no-selection fallback creates a linked \code{TextAnnotation} from the configured built-in pop-up-note tool.
+
+\code{FileOpenEventHandler} lives in \path{shell/okular_main.cpp} rather than as a private class in the executable entry point, which makes both tab and fallback-window behavior directly testable.
+It returns the event to Qt during initial startup when no shell exists, but once an occupied application is running it creates a new shell if all existing shells reject the requested document.
+
+The PDF dismissal logic runs on mouse release and requires all of the following:
+\begin{itemize}
+  \item the released button is the left button;
+  \item press and release occurred on the same PDF page item;
+  \item pointer movement stayed below Qt's drag threshold;
+  \item no annotation object is under the pointer.
+\end{itemize}
+This is why a single deliberate canvas click closes the review note while drags, margins, and annotation markers remain unaffected.
+
+
+\section*{Packaging and deployment lessons}
+
+\agentProposedEdit{agent-remove-a9370764-7a62-4cae-a1bb-21870425beb0}{distinguish the application from its upstream build target}{Craft can build and stage Okular from the custom checkout with:}{}
+\agentProposedEdit
+  {agent-add-54b87184-863b-5df9-b2f2-6de87e7d0588}
+  {Add this agent-authored block for review.}
+  {}
+  {The historical build and self-contained-bundle procedure below is retained for review but is not the current deployment model.
+The authoritative source checkout is \path{/Users/tbe/repos/thoughts-desktop}, and the active install prefix and plugin ecosystem are under \path{/Users/tbe/CraftRoot}.
+Thoughts Desktop must load one coherent CraftRoot Okular core, part plugin, generators, and KDE dependency set.
+A build-tree \code{libOkular6Core} must never be combined with a CraftRoot \code{okularpart.dylib} or generator plugin because the mixed process can fail before or while opening a PDF.
+After a deployment, verification requires a normal application restart, an actual Library or Overview document open, one mapped Okular core in the running process, and a delayed crash check.}
+\begin{DocCode}
+source /Users/tbe/CraftRoot/craft/craftenv.sh
+craft --options okular.srcDir=/Users/tbe/repos/okular-enter \
+  --install --qmerge okular
+\end{DocCode}
+
+The first custom bundle inherited \code{com.apple.quarantine} on thousands of files.
+Finder consequently showed the misleading message that a selected PDF could not be verified as free of malware, even though the unverified object was the custom application handling it.
+\agentProposedEdit{agent-remove-44c97919-6a92-41af-8ca7-f13090adf8e9}{the retired bundle identifier is not the current Thoughts PDF handler}{The local repair removed only the application's inherited quarantine attributes, retained the PDF's own provenance metadata, verified the deep signature again, re-registered the bundle, and assigned \code{org.kde.okular.enter} as the PDF handler.}{}
+Future staged bundles must be quarantine-free before installation and signing.
+
+Copying a newly staged Craft bundle wholesale over the custom application caused an important packaging failure.
+That bundle mixed libraries loaded from \path{/Users/tbe/CraftRoot} with libraries embedded inside the application.
+The resulting process could terminate during startup with:
+\begin{DocCode}
+QWidget: Must construct a QApplication before a QWidget
+\end{DocCode}
+
+\agentProposedEdit{agent-remove-1e14388a-29fa-42e5-8e83-e2e72d73c15b}{the current application intentionally uses one coherent CraftRoot runtime instead of the historical embedded reference bundle}{The reliable deployment used the already self-contained application as the reference bundle:}{}
+\begin{enumerate}
+  \item \agentProposedEdit{agent-remove-c8b3d8e8-2c9d-4c96-ac6a-6b1cce390640}{the retired application bundle is not the current runtime reference}{clone the verified \path{/Applications/Okular-Enter.app} into a staging directory;}{}
+  \item \agentProposedEdit{agent-remove-660978ca-7bbf-44fd-be16-f33f8f0b3a81}{the current deployment uses Thoughts names and a coherent CraftRoot core and plugin set}{copy the newly built \code{okularpart.dylib}, bundled \code{okular-enter-comment-sync} helper, \code{libOkular6Core} whenever core APIs changed, and \path{Contents/MacOS/okular} whenever shell code changed, into the staged bundle;}{}
+  \item \agentProposedEdit{agent-remove-af5a2e6f-ea82-4d0a-91d2-9be5dd08bcb2}{the current deployment does not redirect selected dependencies into a mixed embedded runtime}{compare dependency basenames with the reference binaries and use \code{install_name_tool} to redirect each dependency to the corresponding embedded framework or library;}{}
+  \item \agentProposedEdit{agent-remove-2000a614-9fc0-4e1e-b140-99f3c9f7db47}{CraftRoot runpaths are required by the current coherent runtime}{remove the Craft build and \path{/Users/tbe/CraftRoot/lib} runpaths;}{}
+  \item \agentProposedEdit{agent-remove-f252b955-2afa-4aaf-a370-a8f35f24fccc}{absolute CraftRoot references are expected in the current coherent runtime}{scan the staged Mach-O dependency and runpath metadata for remaining absolute CraftRoot references;}{}
+  \item \agentProposedEdit{agent-remove-b457e528-f4d3-41d5-b8ce-4c7b13acac7e}{signing remains a packaging check but does not make the historical mixed-bundle recipe current}{ad-hoc sign the complete staged application and verify it with \code{codesign --verify --deep --strict};}{}
+  \item \agentProposedEdit{agent-remove-62a7de4b-8153-4aa1-b96f-c32a82576a4b}{the current deployment installs a coherent Thoughts application and CraftRoot runtime rather than this retired staged directory}{deploy the verified staged \code{Contents} directory.}{}
+\end{enumerate}
+
+\agentProposedEdit{agent-remove-4c53c0dc-83de-4166-9058-9ab4c31140a4}{replace the former desktop application name}{When Okular was already running with an important PDF open, the staged and installed \code{Contents} directories were exchanged atomically with macOS \code{renamex_np(..., RENAME_SWAP)} using a temporary helper at \path{/tmp/okular_atomic_swap}.}{}
+\agentProposedEdit
+  {agent-add-d6cb8601-f39f-5944-86aa-1f47653dd437}
+  {Add this agent-authored block for review.}
+  {}
+  {A deployed application update becomes active only after the running Thoughts Desktop process is restarted, because an existing process continues using its already mapped binaries and libraries.}
+This avoided interrupting the existing process and avoided exposing a partially copied application to a new launch.
+The already running process continued using its old mapped code; the installed update became active on the next normal restart.
+\agentProposedEdit{agent-remove-fba2ea8a-aaae-4991-94b8-254eb077d6c3}{replace the former desktop application name}{If no document needs protection, quitting Okular before replacing and signing the staged bundle is simpler.}{}
+\agentProposedEdit
+  {agent-add-8ac18360-8990-5309-8091-63b55c679294}
+  {Add this agent-authored block for review.}
+  {}
+  {Deployment must preserve open tabs and user work, and activation must be verified separately from copying or signing files.}
+
+\end{document}

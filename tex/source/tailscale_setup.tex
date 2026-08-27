@@ -2,9 +2,8 @@
 \docTitle{Tailscale setup}
 \phantomsection
 \label{sec:tailscale-setup}
-Tailscale is installed differently depending if we are running on a machine with admin rights or without.
-In case of the latter, as on the MacBook, we run a userspace \code{tailscaled}
-daemon with the following flags:
+The Tailscale setup depends on whether the machine has administrator privileges.
+In this MacBook configuration, a userspace \code{tailscaled} daemon runs with the following flags:
 \begin{DocCode}
     --tun=userspace-networking
     --state=$HOME/.tailscale/tailscaled.state
@@ -12,17 +11,17 @@ daemon with the following flags:
     --socks5-server=127.0.0.1:11055
     --outbound-http-proxy-listen=127.0.0.1:11055
 \end{DocCode}
-To check if it is running you can run
+To check whether the daemon is running, use:
 \begin{DocCode}
     tailscale --socket "$HOME/.tailscale/tailscaled.sock" status
 \end{DocCode}
-Automatic starting is handled by the LaunchAgent:
+The following LaunchAgent starts the daemon automatically:
 \begin{DocCode}
     ~/Library/LaunchAgents/io.tailscale.tailscaled.userspace.plist
 \end{DocCode}
 
-Note that commands like \code{curl} will not use this userspace network path
-out of the box. Use the local proxy, for example:
+Commands such as \code{curl} do not use this userspace network path by default.
+To route a command through it, use the local SOCKS5 proxy, for example:
 \begin{DocCode}
     curl --proxy socks5h://127.0.0.1:11055 https://example.com
 \end{DocCode}

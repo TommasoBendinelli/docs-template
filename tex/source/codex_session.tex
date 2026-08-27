@@ -1,0 +1,15 @@
+\begin{document}
+\docTitle{LLM Agents usage}
+
+Interactive Codex sessions must be run from the MacBook, ideally from \path{/Users/tbe/Documents/docs}.
+Secrets for this setup are currently loaded from \path{/Users/tbe/Documents/docs/.env}.
+Agent Vault is not part of this workflow because it introduced too many moving parts.
+A future revision should encrypt the secrets file without allowing Codex to decrypt it directly.
+
+\paragraph{Saving conversations}
+Codex conversations are stored locally in \path{/Users/tbe/.codex/sessions} and \path{/Users/tbe/.codex/archived_sessions}.
+They are also backed up in \path{~/agentic_conversations/agentic_sessions/sessions}, which is synchronized with \code{tommaso-desktop} for redundancy.
+
+\paragraph{Skills}
+Skills are maintained at \url{https://github.com/TommasoBendinelli/agentic-tooling/tree/main/skills} and locally in \path{/Users/tbe/Documents/docs/agentic-tooling/skills}.
+\end{document}
